@@ -9,7 +9,7 @@ temperature = 0.6
 top_p = 0.95
 system_prompt = ""
 include_reasoning_in_next_turn = false
-pin_provider = "NovitaAI"
+pin_provider = "novita"
 allow_fallback = false
 
 [r1-initial-local]

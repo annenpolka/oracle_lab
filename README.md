@@ -18,14 +18,16 @@ Python 3.13 or newer and `uv` are recommended.
 ```sh
 uv sync --extra dev
 cp .env.example .env
-uv run oracle --help
-uv run oracle session new --title experiment
-uv run oracle ask "確認しろ。"
-uv run oracle run --until-human
-uv run oracle pause --note "inspect before continuing"
-uv run oracle resume
-uv run oracle quarantine evt_... --note "needs independent evidence"
-uv run oracle revisit evt_... --note "compare against the next branch"
+chmod 600 .env
+# Set OPENROUTER_API_KEY in .env. The file is ignored by Git.
+uv run --env-file .env oracle --help
+uv run --env-file .env oracle session new --title experiment --model r1-initial-openrouter
+uv run --env-file .env oracle ask "確認しろ。" --model r1-initial-openrouter
+uv run --env-file .env oracle run --until-human
+uv run --env-file .env oracle pause --note "inspect before continuing"
+uv run --env-file .env oracle resume
+uv run --env-file .env oracle quarantine evt_... --note "needs independent evidence"
+uv run --env-file .env oracle revisit evt_... --note "compare against the next branch"
 ```
 
 Provider credentials are optional for replay, archive, virtual-world, and

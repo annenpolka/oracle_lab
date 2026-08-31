@@ -21,7 +21,7 @@ def _profile() -> ModelProfile:
         id="r1",
         slug="deepseek/deepseek-r1",
         provider="openrouter",
-        pin_provider="NovitaAI",
+        pin_provider="novita",
         allow_fallback=False,
     )
 
@@ -45,7 +45,7 @@ def test_request_hash_and_nested_values_are_defensively_frozen() -> None:
 def test_openrouter_contract_pins_provider_and_retains_raw_fields() -> None:
     seen: dict[str, object] = {}
     raw = (
-        b'{"id":"req-1","model":"deepseek-r1","provider":"NovitaAI",'
+        b'{"id":"req-1","model":"deepseek-r1","provider":"Novita",'
         b'"choices":[{"message":{"content":"answer","reasoning":{"steps":[1,2]}},'
         b'"finish_reason":"stop"}],"usage":{"prompt_tokens":3,"extension":{"x":1}},'
         b'"future_field":{"nested":["kept"]}}'
@@ -78,17 +78,17 @@ def test_openrouter_contract_pins_provider_and_retains_raw_fields() -> None:
 
     assert seen["authorization"] == "Bearer secret-for-test"
     assert seen["payload"]["provider"] == {
-        "order": ["NovitaAI"],
+        "order": ["novita"],
         "allow_fallbacks": False,
     }
     assert response.raw_bytes == raw
     assert response.provider_name == "openrouter"
-    assert response.routed_provider_name == "NovitaAI"
+    assert response.routed_provider_name == "Novita"
     assert response.generation_settings == {
         "model": "deepseek/deepseek-r1",
         "temperature": 0.6,
         "top_p": 0.95,
-        "provider": {"order": ("NovitaAI",), "allow_fallbacks": False},
+        "provider": {"order": ("novita",), "allow_fallbacks": False},
     }
     assert response.parsed["future_field"]["nested"] == ("kept",)
     assert response.reasoning["steps"] == (1, 2)
@@ -169,7 +169,7 @@ top_p = 0.9
 system_prompt = ""
 include_reasoning_in_next_turn = false
 [routing]
-pin_provider = "NovitaAI"
+pin_provider = "novita"
 allow_fallback = false
 """,
         encoding="utf-8",
@@ -177,7 +177,7 @@ allow_fallback = false
     profile = load_models(path)["nested-r1"]
     assert profile.slug == "deepseek/deepseek-r1"
     assert profile.temperature == 0.7
-    assert profile.pin_provider == "NovitaAI"
+    assert profile.pin_provider == "novita"
 
 
 def test_malformed_success_response_remains_available_for_raw_archive() -> None:

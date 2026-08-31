@@ -579,11 +579,11 @@ def test_output_carries_complete_model_identity_and_context_hash(tmp_path) -> No
         base_request.messages,
         temperature=0.6,
         top_p=0.95,
-        provider_pin="NovitaAI",
+        provider_pin="novita",
         metadata={
             "requested_model_slug": "deepseek/deepseek-r1",
             "requested_provider_id": "openrouter",
-            "provider_routing": {"pin_provider": "NovitaAI", "allow_fallback": False},
+            "provider_routing": {"pin_provider": "novita", "allow_fallback": False},
             "model_family": "deepseek-r1",
             "checkpoint": "initial",
             "runtime": "remote",
@@ -593,7 +593,7 @@ def test_output_carries_complete_model_identity_and_context_hash(tmp_path) -> No
     response = replace(
         _success(b'{"identity":true}'),
         provider_name="openrouter",
-        routed_provider_name="NovitaAI",
+        routed_provider_name="Novita",
         provider_model_id="deepseek-r1-actual",
         generation_settings={"model": "deepseek/deepseek-r1"},
         material_origin="historical_fixture",
@@ -612,8 +612,8 @@ def test_output_carries_complete_model_identity_and_context_hash(tmp_path) -> No
         "runtime": "remote",
         "quantization": "provider-defined",
         "requested_provider_id": "openrouter",
-        "provider_routing": {"pin_provider": "NovitaAI", "allow_fallback": False},
-        "actual_provider": "NovitaAI",
+        "provider_routing": {"pin_provider": "novita", "allow_fallback": False},
+        "actual_provider": "Novita",
         "actual_model_identifier": "deepseek-r1-actual",
         "fallback_occurred": False,
         "unknown_fields": (),
@@ -625,7 +625,7 @@ def test_output_carries_complete_model_identity_and_context_hash(tmp_path) -> No
         "api_revision": None,
         "generation_settings": {"model": "deepseek/deepseek-r1"},
         "provider_adapter": "openrouter",
-        "routed_provider_name": "NovitaAI",
+        "routed_provider_name": "Novita",
     }
 
 
@@ -635,11 +635,11 @@ def test_missing_routed_provider_keeps_fallback_status_unknown(tmp_path) -> None
     request = OracleGenerateRequest(
         base_request.model_profile_id,
         base_request.messages,
-        provider_pin="NovitaAI",
+        provider_pin="novita",
         metadata={
             "requested_model_slug": "deepseek/deepseek-r1",
             "requested_provider_id": "openrouter",
-            "provider_routing": {"pin_provider": "NovitaAI"},
+            "provider_routing": {"pin_provider": "novita"},
         },
     )
     response = replace(
