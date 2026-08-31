@@ -44,6 +44,7 @@ def test_root_and_nested_help_expose_the_complete_control_plane(
     replay = runner.invoke(cli.app, ["replay", "--help"])
     worker = runner.invoke(cli.app, ["worker", "--help"])
     worker_enqueue = runner.invoke(cli.app, ["worker", "enqueue", "--help"])
+    worker_isolation = runner.invoke(cli.app, ["worker", "isolation", "--help"])
     worker_patch = runner.invoke(cli.app, ["worker", "patch", "--help"])
 
     assert root.exit_code == 0
@@ -98,6 +99,7 @@ def test_root_and_nested_help_expose_the_complete_control_plane(
         == replay.exit_code
         == worker.exit_code
         == worker_enqueue.exit_code
+        == worker_isolation.exit_code
         == worker_patch.exit_code
         == 0
     )
@@ -117,8 +119,12 @@ def test_root_and_nested_help_expose_the_complete_control_plane(
     assert "bundle" in export.output and "transcript" in export.output and "corpus" in export.output
     assert "trace" in provenance.output and "event" in provenance.output
     assert "exact" in replay.output and "host" in replay.output
-    assert all(command in worker.output for command in ("enqueue", "patch", "readiness", "status"))
+    assert all(
+        command in worker.output
+        for command in ("enqueue", "isolation", "patch", "readiness", "status")
+    )
     assert "repository-edit" in worker_enqueue.output
+    assert "probe" in worker_isolation.output
     for command in ("show", "approve", "reject", "status"):
         assert command in worker_patch.output
     for command in (
@@ -320,3 +326,104 @@ def test_worker_readiness_cli_redacts_valid_toml_scalar_errors(
     document = json.loads(result.output)
     assert document["status"] == "failed"
     assert document["checks"][0]["reason_id"] == "agents_config_invalid"
+
+
+def test_worker_isolation_probe_requires_explicit_read_only_observation_gate(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def forbidden_service() -> object:
+        raise AssertionError("isolation probe initialized the Oracle Lab service")
+
+    def forbidden_probe(**_options: object) -> object:
+        raise AssertionError("isolation probe ran without the explicit execution gate")
+
+    monkeypatch.setattr(cli, "_service_factory", forbidden_service)
+    monkeypatch.setattr(cli, "observe_and_archive_no_model_sbx", forbidden_probe)
+
+    result = CliRunner().invoke(
+        cli.app,
+        [
+            "worker",
+            "isolation",
+            "probe",
+            "--archive-root",
+            str(tmp_path / "archive"),
+        ],
+    )
+
+    assert result.exit_code == 1, result.output
+    document = json.loads(result.output)
+    assert document == {
+        "attestation_issued": False,
+        "ready": False,
+        "reason_id": "read_only_sbx_observation_not_confirmed",
+        "safe_to_start_worker": False,
+        "schema_version": 1,
+        "status": "blocked",
+    }
+
+
+def test_worker_isolation_probe_is_service_less_and_emits_non_authorizing_archive(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    archive_root = tmp_path / "archive"
+    calls: list[dict[str, object]] = []
+
+    class Report:
+        status = "observed"
+
+        @staticmethod
+        def to_public_dict() -> dict[str, object]:
+            return {
+                "schema_version": 1,
+                "status": "observed",
+                "ready": False,
+                "safe_to_start_worker": False,
+                "attestation_issued": False,
+            }
+
+    class Archive:
+        @staticmethod
+        def to_public_dict() -> dict[str, object]:
+            return {"manifest_sha256": "f" * 64}
+
+    def forbidden_service() -> object:
+        raise AssertionError("isolation probe initialized the Oracle Lab service")
+
+    def fake_probe(**options: object) -> tuple[Report, Archive]:
+        calls.append(dict(options))
+        return Report(), Archive()
+
+    monkeypatch.setattr(cli, "_service_factory", forbidden_service)
+    monkeypatch.setattr(cli, "observe_and_archive_no_model_sbx", fake_probe)
+
+    result = CliRunner().invoke(
+        cli.app,
+        [
+            "worker",
+            "isolation",
+            "probe",
+            "--archive-root",
+            str(archive_root),
+            "--sandbox-name",
+            "existing-sandbox",
+            "--observe-read-only-control-plane",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    document = json.loads(result.output)
+    assert document["status"] == "observed"
+    assert document["ready"] is False
+    assert document["safe_to_start_worker"] is False
+    assert document["attestation_issued"] is False
+    assert document["archive"]["manifest_sha256"] == "f" * 64
+    assert calls == [
+        {
+            "archive_root": str(archive_root),
+            "sandbox_name": "existing-sandbox",
+            "executable": "sbx",
+        }
+    ]

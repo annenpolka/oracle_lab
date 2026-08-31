@@ -212,6 +212,34 @@ The current blocker IDs are `workspace_quiescence`,
 `profile_workspace_binding`. They must be cleared by measured production
 conformance, not by changing readiness output.
 
+After static readiness, an operator can run an explicitly gated, read-only
+control-plane observation. It executes only `sbx version`, `sbx ls --json`, and,
+when requested, `sbx inspect NAME --json`. It never creates, enters, stops, or
+removes a sandbox and never starts Codex/OpenCode or an Oracle model:
+
+```sh
+uv run oracle worker isolation probe \
+  --archive-root /absolute/operator-owned/path/sbx-observations \
+  --observe-read-only-control-plane
+```
+
+Pass `--sandbox-name NAME` to archive two independent name-selected views of an
+already-existing sandbox. The report deliberately does not join the UUID from
+`ls` to the workspace/image fields from `inspect`; it fixes
+`atomic_instance_binding_proven=false`. Exact bounded argv, stdout, and stderr
+are committed to a write-once archive with mode `0600`; public JSON contains
+hashes, byte counts, and explicit provenance edges instead of raw command data
+or archive filesystem paths. A successful probe reports `status=observed`, while
+`ready=false`, `safe_to_start_worker=false`, and `attestation_issued=false`
+remain fixed.
+
+Automated `sbx create`/`sbx rm` is intentionally absent. In v0.39, mutation is
+name-selected and the observed server UUID is not an atomic/CAS selector, so a
+pre-removal identity check cannot prevent name reuse in the check-to-use gap.
+Sandbox startup can also inherit Docker-managed skills, MCP, policy, or service
+credential scope unless those boundaries are independently proven. The six
+production blockers therefore remain in force.
+
 On Apple silicon macOS, Docker's standalone CLI is installed and initialized
 separately from the legacy `docker sandbox` plugin:
 

@@ -12,6 +12,7 @@ import typer
 
 from oracle_lab.events import Actor, ActorKind
 from oracle_lab.jsonutil import json_default
+from oracle_lab.sbx_probe import SbxProbeError, observe_and_archive_no_model_sbx
 from oracle_lab.services import OracleLabService, ServiceError
 from oracle_lab.worker_readiness import inspect_worker_readiness
 
@@ -26,6 +27,10 @@ research_app = typer.Typer(no_args_is_help=True, help="Query research sequences"
 replay_app = typer.Typer(no_args_is_help=True, help="Replay fixed history or host analysis")
 worker_app = typer.Typer(no_args_is_help=True, help="Run explicitly enabled Host workers")
 worker_enqueue_app = typer.Typer(no_args_is_help=True, help="Enqueue worker tasks")
+worker_isolation_app = typer.Typer(
+    no_args_is_help=True,
+    help="Run explicit no-model coding-worker isolation observations",
+)
 worker_patch_app = typer.Typer(no_args_is_help=True, help="Inspect and judge candidate patches")
 
 app.add_typer(session_app, name="session")
@@ -38,6 +43,7 @@ app.add_typer(research_app, name="research")
 app.add_typer(replay_app, name="replay")
 app.add_typer(worker_app, name="worker")
 worker_app.add_typer(worker_enqueue_app, name="enqueue")
+worker_app.add_typer(worker_isolation_app, name="isolation")
 worker_app.add_typer(worker_patch_app, name="patch")
 
 _service_factory: Callable[[], OracleLabService] = OracleLabService.default
@@ -438,6 +444,71 @@ def worker_readiness(
     report = inspect_worker_readiness(path)
     _emit(report.to_dict())
     if not report.ready:
+        raise typer.Exit(code=1)
+
+
+@worker_isolation_app.command("probe")
+def worker_isolation_probe(
+    archive_root: Annotated[
+        str,
+        typer.Option(
+            "--archive-root",
+            help="Operator-owned directory outside the target repository",
+        ),
+    ],
+    sbx_executable: Annotated[
+        str,
+        typer.Option("--sbx-executable", help="Standalone Docker sbx executable"),
+    ] = "sbx",
+    sandbox_name: Annotated[
+        str | None,
+        typer.Option(
+            "--sandbox-name",
+            help="Optionally inspect one already-existing sandbox by its exact name",
+        ),
+    ] = None,
+    observe_read_only_control_plane: Annotated[
+        bool,
+        typer.Option(
+            "--observe-read-only-control-plane",
+            help="Explicitly allow read-only sbx version/list/inspect commands",
+        ),
+    ] = False,
+) -> None:
+    """Archive a read-only real sbx observation without issuing attestation."""
+
+    if not observe_read_only_control_plane:
+        _emit(
+            {
+                "schema_version": 1,
+                "status": "blocked",
+                "reason_id": "read_only_sbx_observation_not_confirmed",
+                "ready": False,
+                "safe_to_start_worker": False,
+                "attestation_issued": False,
+            }
+        )
+        raise typer.Exit(code=1)
+    try:
+        report, archive = observe_and_archive_no_model_sbx(
+            archive_root=archive_root,
+            sandbox_name=sandbox_name,
+            executable=sbx_executable,
+        )
+    except SbxProbeError as error:
+        _emit(
+            {
+                "schema_version": 1,
+                "status": "failed",
+                "reason_id": error.reason_id,
+                "ready": False,
+                "safe_to_start_worker": False,
+                "attestation_issued": False,
+            }
+        )
+        raise typer.Exit(code=1) from None
+    _emit({**report.to_public_dict(), "archive": archive.to_public_dict()})
+    if report.status != "observed":
         raise typer.Exit(code=1)
 
 

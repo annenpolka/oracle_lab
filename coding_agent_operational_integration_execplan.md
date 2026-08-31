@@ -64,6 +64,20 @@ candidate patchを確認し、人間承認後にsource-independent standalone st
 - [x] (2026-08-31 05:46:32Z) ExecPlan validator、Ruff format/check、compileall、全体pytestをreadiness統合後の同一スナップショットで通過させた。644 passed、1 live opt-in skipで、実Codex/OpenCode/Oracle modelは起動していない。
 - [x] (2026-08-31 06:09:46Z) 2回のtimeout後、Humanのaction-time confirmationを受けてfresh `sbx secret set openai --oauth` flowを完了した。CLIはglobal scopeへの保存を報告し、`sbx secret ls`は`openai (oauth configured)`を返した。token値は読み出していない。
 - [x] (2026-08-31 06:14:58Z) コミット前の同一スナップショットでExecPlan validator、Ruff format/check、compileall、全体pytest、`git diff --check`を再実行した。644 passed、1 live opt-in skipで、実agent/modelは起動していない。
+- [x] (2026-08-31 07:05:49Z) no-model実`sbx v0.39` observationマイルストーンを開始し、strict decoder、非authorizing report、read-only archive、focused/full検証まで完了した。server-issued instance bindingとmutating cleanupは達成扱いにせず、後続security auditでv0.39のname-selected TOCTOUを閉じられないと判明したため撤去した。sandbox ownershipを含むproduction evidence不足は下記の独立した未完了blockerとして維持し、production bindとlive-agent gateを解除しない。
+- [x] (2026-08-31 07:34:59Z) 実`sbx v0.39` strict decoder、非authorizing report、explicit CLI gate、0600 write-once raw archive、disposable fixture marker、UUID/name/workspace/image binding、操作・cleanup前再確認を実装し、no-model実probe `obs_3fa366faef9f4874804beb05e47073d4`を`status=observed`かつcleanup confirmedで完了した。production blockerは解除していない。
+- [x] (2026-08-31 08:27:02Z) 後続security auditでname-selected cleanupのcheck-to-use race、失敗createの所有権誤認、shared skills/MCP/credential scope、runner由来偽装を発見した。実probeから`create`/`exec`/`run`/`stop`/`rm`をすべて撤去し、exact concrete subprocess runnerによるread-only `version`/`ls`/optional `inspect`だけへ縮退した。
+- [x] (2026-08-31 08:27:02Z) explicit provenance edgeとargv/stdout/stderrの0600原子的archiveを実装し、read-only実probe `obs_f58ae6caf1564d198feb8d8c7cfed1b6`を空inventory、`status=observed`で完了した。manifest SHA-256は`b46838075c9851fa6744f221e921f6e1140680501daf29b5970bce2b0eee3049`で、side-effecting command、sandbox、agent/modelは起動していない。
+- [x] (2026-08-31 08:32:13Z) security-focused suiteは240 passed、1 live opt-in skip、全体pytestは683 passed、1 live opt-in skipだった。Ruff format/check、compileall、ExecPlan validator、`git diff --check`も同一スナップショットで成功した。
+- [x] (2026-08-31 08:36:58Z) report constructorのruntime type validationとfixed read-only argv allowlistを最終hardeningし、全体pytestを再実行して683 passed、1 live opt-in skip in 38.12sを確認した。
+- [x] (2026-08-31 09:58:14Z) archive境界refactor前に指定focused baselineを実行して108 passedを確認し、対象SBX production 3 moduleを`wc -l`で2068行と記録した。baseline失敗の修正や期待値変更を混ぜずに着手した。
+- [x] (2026-08-31 09:58:14Z) fixed read-only argv、report/provenance整合性、truth-domain対応、public metadata、raw artifact/manifest組立てを`sbx_observation_payload.py`へ集約した。probeは実行/decode/report orchestration、archiveはexact concrete reportから凍結済みpayloadを受け取るfilesystem commitへ縮退し、production LOCは1982行まで減少した。
+- [x] (2026-08-31 10:53:07Z) final archive-boundary auditでimmutable snapshot、real issuance seal、exact UTC、canonical operation/provenance/name binding、callback secret redaction、artifact owner検査、runtime type-hint互換を追加した。focused suiteは129 passed、全体pytestは711 passed、1 live opt-in skipで、最終production LOCは2066行だった。
+- [x] (2026-08-31 11:12:53Z) 公開例外のdirect `RuntimeError` MRO、安全なbuilt-in zero-offset timezoneの受理、public reason IDのsecret-carrier拒否を回復・追加し、real成功回帰を実probe `obs_f58ae6caf1564d198feb8d8c7cfed1b6`由来の明示historical fixtureへ置換した。focused suiteは131 passed、全体pytestは713 passed、1 live opt-in skip、production LOCは2066行だった。
+- [x] (2026-08-31 11:34:27Z) public reason IDをexact発行候補allowlistへ変更し、provenance/argvのhostile string subclassをcallback非実行で拒否した。archive traversalのchild dirfd close保証とmode/owner検査の単一化も追加し、focused suiteは137 passed、production LOCは2066行になった。旧manifestのunknownをcurrent-schemaのfalseへ変換するテストhelperはhistorical importではなくmanual real-raw replayと明記し、source/replay hashの不一致を回帰にした。
+- [x] (2026-08-31 11:41:49Z) 最終同一snapshotでfocused 137 passed、全体pytest 719 passed/1 live opt-in skip、Ruff format/check、ExecPlan validator、`git diff --check`を通過した。二系統のread-only security auditでも残存P0/P1なしを確認し、live SBX、sandbox、Codex/OpenCode、OracleProvider、外部modelは起動していない。
+- [x] (2026-08-31 11:46:51Z) archive adapterに残っていたexact report typeの事前判定を削除し、任意Protocolへ触れず拒否する正本をcanonical payload builderだけにした。focused suiteは137 passedを維持し、production LOCは2063行、baseline比5行減になった。
+- [x] (2026-08-31 12:03:13Z) historical Progressのno-model observation完了部分と、現在も未解決のproduction isolation blockerを分離した。過去のmutating ownership probeを成功扱いへ変更せず、残作業を特権broker/conformance、6 blocker、明示opt-in live smokeの二つの未完了項目へ整理した。
 - [ ] (2026-08-31 03:46:21Z) security auditで発見したworkspace quiescence、guest Git control、data-plane network/credential、actual template instance、sandbox ownership、profile/workspace bindingの証拠不足を解消する。解消まではproduction `sbx` bindingを明示的に拒否し、実agent smokeを実行しない。
 
 ## Surprises & Discoveries
@@ -200,6 +214,66 @@ candidate patchを確認し、人間承認後にsource-independent standalone st
 - Observation: `sbx diagnose`全check成功はHost前提の確認であり、Oracle Labのproduction attestationではない。
   Evidence: 実機では12 checksがpassしたが、workspace quiescence、guest Git control receipt、credential non-disclosure、instance template digest、ownership race、profile/input bindingは診断対象に含まれない。
 
+- Observation: Docker Sandboxes serviceのrefresh tokenは一度`invalid_grant`を返したが、明示的な`sbx login`後は公式diagnosticが再び12 passed、0 failed、0 skippedになった。
+  Evidence: 失効観測と再ログインを分離して記録し、OpenAI service secretの存在をDocker service login成功の代替にしなかった。
+
+- Observation: 実`sbx v0.39.0`には`sbx inspect SANDBOX_NAME --json`があり、agent、state、workspace、network policy、secrets、active sessionsをsandbox単位で観測できる。一方、空inventoryの`sbx ls --json`は`{"sandboxes":[]}`、`template ls --json`はshort image IDだけを返した。
+  Evidence: 再ログイン後のHost control planeからhelpとraw JSONを取得した。実sandboxのinspect schemaとinstance UUID/image identityはno-model probeで追加観測する。
+
+- Observation: credentialを継承しない最小環境から`sbx create --clone`を起動する場合も、`sbx`内部のHost Git探索には固定`PATH`が必要だった。
+  Evidence: 初回の実CLI probe `obs_b55836bfafa349f1b9c29dce26c7173b`はsandboxを作らず`sbx_probe_create_failed`で停止し、raw stderrを非公開archiveへ保存した。任意operator PATHを継承せず`os.defpath`を渡す修正後、同じfixture classでcreateに成功した。
+
+- Observation: 実`inspect --json`はtag形式のrequested imageと完全な`image_digest`を返し、`ls --json`はserver UUIDを返すが、name-selected commandはUUIDをselectorとして受け付けない。
+  Evidence: 最終probeはname、UUID `5d3c35c1-08d3-4298-8f36-1032594fe239`、workspace、image digestをcreate後とcleanup直前に再確認し、削除後inventoryを空として観測した。別のread-only試行でUUIDを`inspect` selectorへ渡すとnot foundになった。
+
+- Observation: name/UUIDを`ls`と`inspect`で再確認してから`rm NAME`しても、確認と削除の間にnameが別UUIDへ再利用されると別sandboxを削除できる。
+  Evidence: v0.39のmutation CLIはserver UUID/CAS tokenを受け付けることを証明できず、create成功出力もserver UUIDを因果的に返さない。高entropy name、成功exit、前後inventoryはこのcheck-to-use gapを閉じない。
+
+- Observation: read-only `ls`とname-selected `inspect`を2回ずつ成功させても、UUIDとinspect fieldsを同一instanceへ原子的に結べない。
+  Evidence: ABAで`ls`がinstance AのUUID、`inspect`が同名instance Bのworkspace/imageを返し、次の組も同じ交互順になる可能性がある。agent/status/workspaceが一致しても架空のcomposite identityを排除できないため、derived identity型を撤去した。
+
+- Observation: `no-model shell`というagent選択だけではsandbox startupの共有状態を空にできない。
+  Evidence: 実inspectはMCP gateway/secret referenceを返し、v0.39にはshared skills、global service credentials、built-in network allowancesがある。専用scopeとempty credential/MCP/skills/network境界を起動前に証明できないため、観測コードからsandbox作成自体を撤去した。
+
+- Observation: injected runnerの自己申告文字列をtruth-domainの根拠にするとsynthetic bytesを`real`として保存できる。
+  Evidence: arbitrary runnerの`evidence_origin=production`を拒否し、exact concrete `SubprocessCommandRunner`だけが`truth_domain=real`を生成できる回帰を追加した。returned argvもrequested argvと完全一致しなければ受理しない。
+
+- Observation: hardened archiveの初回Host実行はfilesystem sandboxのEPERMをstaging collisionと誤分類した。
+  Evidence: home archiveはowner一致・0700・staging残骸なしで、同一処理は`/private/tmp`で成功した。staging mkdirのerrno分類を修正し、escalated Host実行では同じhome archiveへの原子的commitに成功した。
+
+- Observation: arbitrary Protocol reportを保存前に検証して拒否する実装でも、拒否理由を分類するために`to_public_dict()`や属性へ触れると、その時点で任意Python side effectを実行できる。
+  Evidence: independent refactor auditでpayload builderのlegacy rejection pathを反証した。archiveとbuilderの最初の判定をexact `SbxNoModelObservationReport` type checkへ変更し、exploding Protocolの`to_public_dict()`が一度も呼ばれない回帰を追加した。
+
+- Observation: report constructorとarchive直前に同じ安全条件を別実装すると、validation回数を維持していても条件集合とreason mappingがdriftする。
+  Evidence: refactor前はread-only argv、status/origin/truth、provenance completeness、public key set、raw hash/sizeがprobe/report/archiveへ重複していた。現在は同じpayload validatorを生成時とarchive直前に再実行し、object-level tamperを二境界で検出する。
+
+- Observation: frozen dataclassも`object.__setattr__`や並行処理では発行後に変更できるため、seal検証後に元reportを再参照するとraw artifactとmanifestを別状態から組み立て得る。
+  Evidence: archive入口でversion、observations、provenanceをexact concrete型へ複製し、そのsnapshot自身の共通validatorとreal sealを検証して以後はsnapshotだけを読む。最初のhash計算時に元reportを変更しても変更前raw bytesが保存される回帰で固定した。
+
+- Observation: exact `datetime`だけではstateful custom `tzinfo` callbackを排除できず、provenanceの集合一致だけではsource入替え、edge順序、別sandbox名の二つのinspectを拒否できない。
+  Evidence: exact built-in `datetime.timezone`のzero-offsetだけを許し、custom callback timezoneを非実行で拒否する。canonical operation prefix、derived-fieldごとのexact source tuple/order、inspect名一致も単一validatorとtamper回帰で固定した。
+
+- Observation: 公開型のimport/pickle identityを保つための`__module__`付替えは、移動先moduleにannotation名がなければ`typing.get_type_hints()`を壊す。
+  Evidence: probe/archive側へ必要なannotation名を明示再exportし、report、observation、legacy Protocolとpublic methodのtype-hint解決を回帰試験にした。
+
+- Observation: 0600 mode確認だけではartifact owner検査にならない。
+  Evidence: raw artifactとmanifestの各open descriptorで`st_uid == geteuid`も検証し、foreign-owner statを注入した場合はcanonical archiveを残さずfail closedする。
+
+- Observation: regex形状だけを検査したpublic `reason_id`はsecret-like文字列のcarrierになり得て、LOC削減用のprivate exception baseは公開例外のMROを変える。
+  Evidence: reason IDを`sbx_probe_*`または`sbx_v039_*`へ限定してcredential/password/private/secret/token類を拒否し、公開三例外が直接`RuntimeError`を継承することを回帰試験にした。
+
+- Observation: forbidden-word regexを追加しても`ghp_*`や`sk_live_*`形式のsecret-like値はpublic `reason_id`を通過でき、tuple equalityだけのprovenance検査は`str` subclassのcallbackを実行できる。
+  Evidence: incomplete reportが受理できるreason IDをfixed operation failure、strict decoder failure、明示fixture reasonを含むexact集合へ限定し、非発行IDとhostile provenance subclassがarchive root作成前にsecret非露出で拒否される回帰を追加した。read-only argv正本もtuple equality前に全要素のexact `str`型を検査し、mutating文字列を偽装するsubclassをrunner callback非実行で拒否する。
+
+- Observation: `obs_f58ae6caf1564d198feb8d8c7cfed1b6`の保存済みmanifestは`name_selected_inspect_observed`と`atomic_instance_binding_proven`をunknownの`null`で保持していたが、current-schema test helperは両方を`false`にして別hashを生成していた。
+  Evidence: 旧manifest hash `b46838075c9851fa6744f221e921f6e1140680501daf29b5970bce2b0eee3049`とcurrent-schema replay hash `ab54d0fc4548d44c3520cd9d612e11380549289ad835875f92545dea902e969b`を区別し、このhelperをhistorical session importと呼ばない回帰へ変更した。旧archive自体は変更していない。
+
+- Observation: archive root traversalはopen済みchild dirfdの`fstat`失敗時に親だけをcloseし、childを漏らし得た。
+  Evidence: 親dirfdをchildへ引き継ぐ前にcloseし、以後の失敗はouter `finally`相当経路がcurrent childをcloseする順序へ変更した。失敗注入で二つのdescriptorが閉じられることを固定した。
+
+- Observation: archive adapterとcanonical payload builderの双方にexact concrete report判定が残り、同じ入力を同じreasonで拒否していた。
+  Evidence: builderは型不一致時にProtocol属性やmethodを一切評価せずstable payload errorを返すため、adapter側判定を除去してもarbitrary Protocol非実行回帰と公開reasonは不変だった。
+
 ## Decision Log
 
 - Decision: コーディングエージェントは常に `worker` actorとして記録する。
@@ -326,6 +400,58 @@ candidate patchを確認し、人間承認後にsource-independent standalone st
   Rationale: availability、ログイン、preset名、synthetic fixtureを未測定capabilityの証明として扱わないため。
   Date/Author: 2026-08-31 05:25:22Z / Operational readiness
 
+- Decision: 実`sbx`の部分観測は`IsolationAttestation`と別の非authorizing report型へ保存し、全capabilityが証明されるまで`status=passed`、`ready=true`、profile有効化を表現できないようにする。
+  Rationale: 実control-plane schemaの学習とproduction実行権限を型レベルで分離し、不完全な観測をattestationへ昇格させないため。
+  Date/Author: 2026-08-31 07:05:49Z / Real observation milestone
+
+- Decision: UUID/name bindingの観測とcleanup確認に成功しても、v0.39の操作がname selectorとidentity checkの間を原子的に結ばない限り`sandbox_ownership` blockerを解除しない。
+  Rationale: 高entropy nameと前後確認は競合を検出できるが、checkとname-selected `rm`の間のTOCTOUを機械的に不可能とは証明しないため。
+  Date/Author: 2026-08-31 07:34:59Z / Real ownership observation
+
+- Decision: no-model observation APIからsandbox lifecycle mutationを撤去し、既存control planeへのread-only operationだけを許可する。
+  Rationale: UUID/CAS selectorと専用empty runtime scopeがない状態で自動cleanupを継続すると、別sandboxの誤削除またはHost-managed stateへの不要な到達を起動前に排除できないため。
+  Date/Author: 2026-08-31 08:27:02Z / Post-probe security audit
+
+- Decision: real truth domainは内部生成したexact concrete subprocess runnerだけが発行し、version、inventory、name-selected inspectの各derived fieldをsource operation IDへ明示的に結ぶ。
+  Rationale: runnerの自己申告をprovenanceとして信頼せず、raw argv/stdout/stderrからderived observationを再構築可能にするため。
+  Date/Author: 2026-08-31 08:27:02Z / Observation provenance hardening
+
+- Decision: sbx observation archiveはdirfd/O_NOFOLLOWでancestorを固定し、0600 staging artifactsをfsyncした後にno-replace atomic renameでcommitする。
+  Rationale: raw tool outputがsymlink raceで別pathへ書かれたり、partial directoryがcanonical archiveとして見えたり、同じprobe IDが上書きされたりすることを防ぐため。
+  Date/Author: 2026-08-31 08:27:02Z / Observation archive hardening
+
+- Decision: SBX observationのsemantic contractとcanonical archive payloadは`sbx_observation_payload.py`を単一正本とし、report生成時とarchive直前の両方で同じvalidatorを呼ぶ。
+  Rationale: defense layerを減らさず、read-only argv、truth domain、provenance、public metadata、raw hash/size、manifest layoutの実装重複だけを除去するため。
+  Date/Author: 2026-08-31 09:58:14Z / Archive boundary refactor
+
+- Decision: archive入口はProtocolの自己申告を評価せず、exact concrete reportだけをcanonical immutable payloadへ変換する。`worker_archive.py`と`validation_archive.py`への共通化は行わない。
+  Rationale: arbitrary method executionを拒否前に起こさず、異なるarchiveのsecurity semanticsを見た目だけで共通化しないため。既存のdirfd/O_NOFOLLOW、mode、fsync、no-replace処理は独立したFS境界として維持する。
+  Date/Author: 2026-08-31 09:58:14Z / Archive boundary refactor
+
+- Decision: archive直前にreportのnested evidenceをexact concrete immutable snapshotへ固定し、real sealをsnapshot上で再検証してからpublic manifestとraw artifactsの両方を同じsnapshotだけから生成する。
+  Rationale: validationとserialization間のobject mutation、ABA、stateful callbackによる状態分裂を閉じ、生成時とarchive時の二つの防御境界を共通validatorのまま維持するため。
+  Date/Author: 2026-08-31 10:53:07Z / Final archive-boundary audit
+
+- Decision: real reportのseal keyとauthority tokenはclosure外へ公開せず、exact internal `SubprocessCommandRunner`経路だけがprivate issuerを呼ぶ。同一Python process内のprivate実装へ到達できるcodeはtrusted boundary内とし、注入runnerの自己申告は引き続きsynthetic以外へ昇格させない。
+  Rationale: arbitrary Protocol、fake runner、直接constructorからreal truth domainを発行できないようにしつつ、Python process内のreflection耐性を偽のsecurity claimにしないため。real成功回帰にはmanifest SHA-256 `b46838075c9851fa6744f221e921f6e1140680501daf29b5970bce2b0eee3049`で保存済みの実probe raw/identity metadataを明示historical fixtureとして使い、テスト生成executableのbytesをrealへ昇格させない。
+  Date/Author: 2026-08-31 10:53:07Z / Real evidence issuance boundary
+
+- Decision: 上記real成功回帰の入力はimmutable historical session importではなく、保存済みreal raw/identity metadataから手動再構築したcurrent-schema replayとして扱う。旧manifestのunknownを補完した事実を隠さず、二つのmanifest hashを同一視しない。
+  Rationale: historical importのmissing metadataを発明せず、real raw seal経路のoffline回帰と旧archiveの不変な履歴を区別するため。テスト用replayはcanonical corpusへ投入せず、live SBXを再実行しない。
+  Date/Author: 2026-08-31 11:34:27Z / Historical unknown preservation
+
+- Decision: public `reason_id`は形状や禁止語ではなく、probeが発行し得るexact reason集合と明示fixture reasonだけを受理する。archive用error分類集合はreportへ発行可能な集合と同一視しない。
+  Rationale: stable reason ID欄をraw/credentialのcarrierにせず、report生成時とarchive snapshot再検証時で同じ閉じた規則を使うため。
+  Date/Author: 2026-08-31 11:34:27Z / Public metadata boundary
+
+- Decision: archive inputのconcrete type trust判定はcanonical payload builderだけが所有し、filesystem adapterはその検証済みimmutable payloadだけを保存する。
+  Rationale: archive rootへ触れる前のfail-closed順序とProtocol callback非実行を保ったまま、同一条件の二重実装を残さないため。
+  Date/Author: 2026-08-31 11:46:51Z / Concrete archive input boundary
+
+- Decision: operation順序、derived-field順序とsource tuple、二つのinspectのsandbox名はcanonical contractの一部とし、artifact fileのmodeとownerを同じdescriptorから検査する。
+  Rationale: field単体が安全でも並べ替えやcross-field substitutionで別の意味へ変わること、およびmodeだけでは別ownerのartifactを排除できないことをarchive前に閉じるため。
+  Date/Author: 2026-08-31 10:53:07Z / Cross-field and filesystem hardening
+
 ## Outcomes & Retrospective
 
 このセクションは各マイルストーン終了時に更新する。完了時には、標準CLIから
@@ -389,6 +515,69 @@ production attestationや実Codex/OpenCode連携の完了を意味しない。Or
 値を読み出さない`sbx secret ls`確認は`openai (oauth configured)`を返した。Host Codexも
 `codex login status`でChatGPT loginを報告した。このcredential準備はproduction attestation、profile有効化、
 live-agent smokeの代替ではなく、6 blockerと`safe_to_start_worker=false`は維持する。
+
+2026-08-31 08:27:02Z時点で、最初のreal lifecycle observationは実schema、instance UUID、image digestを
+取得する探索としては有効だったが、automatic ownership/cleanupの安全性を証明しなかった。後続auditで、
+name-selected cleanupのTOCTOU、nonzero createと競合additionの因果不足、sandbox startupのshared
+skills/MCP/credential/policy scopeが判明したため、そのmutation実装を完成扱いせず撤去した。historical raw
+archiveと当時の結果は書き換えず、後続decisionとcontradictionとして残す。
+
+代替として、実行可能なcontrol-plane経路をread-only `version`、`ls`、optional `inspect`へ限定した。
+`status`はruntime validationで`observed`/`incomplete`以外を拒否し、`ready`、`safe_to_start_worker`、
+`attestation_issued`は常にfalseである。version、inventory、optional name-selected inspectはsource
+operation IDsへ明示的に結ぶが、UUID/workspace/imageのcomposite identityは生成せず、
+`atomic_instance_binding_proven=false`を固定する。raw argv/stdout/stderrはdirfd/O_NOFOLLOW、0600、
+fsync、atomic no-replace commitを通す。
+
+実Host probe `obs_f58ae6caf1564d198feb8d8c7cfed1b6`は`sbx v0.39.0`と空inventoryを観測し、
+manifest SHA-256 `b46838075c9851fa6744f221e921f6e1140680501daf29b5970bce2b0eee3049`で完了した。
+side-effecting commandは発行せず、sandbox、Codex/OpenCode、OracleProvider、外部modelを起動していない。
+productionの6 blockerとlive-agent skipは全て維持され、当初のoperational integration最終目的は未達である。
+
+2026-08-31 09:58:14Zのarchive境界refactorでは、外部schema、filename、reason ID、raw bytes、hash、
+provenance、non-authorizing flagsを変えずにsemantic validationとmanifest assemblyを一つのpayload層へ
+集約した。canonical fixtureのmanifest SHA-256
+`3f7a5067ccaa7e510bcbec1d001a68c1e380abd6f7aa1f9f13cdcb3a6d3df2ff`はrefactor前後で一致し、
+whitespace、CRLF、NUL、不正UTF-8、malformed markupを含むstdout/stderrもbyte-for-byteで一致した。
+arbitrary Protocol、forged real、seal/provenance/argv tamperはarchive root作成前に拒否する。
+
+`wc -l`による対象production LOCは、refactor前の
+`sbx_observation.py` 465 + `sbx_observation_archive.py` 851 + `sbx_probe.py` 752 = 2068行から、
+refactor後の465 + `sbx_observation_payload.py` 658 + 406 + 453 = 1982行へ86行減少した。
+format圧縮、型削除、filesystem check削除による削減ではない。production binding、6 blocker、
+live-agent skipは変更せず、live `sbx`、sandbox、Codex/OpenCode、OracleProvider、外部modelは起動していない。
+
+2026-08-31 11:12:53Zのfinal hardening後は、上記1982行の中間snapshotへimmutable copy、closure-sealed
+real issuance、cross-field canonical validation、callback error normalization、artifact owner検査を追加した。
+最終`wc -l`は`sbx_observation.py` 465 + `sbx_observation_payload.py` 738 +
+`sbx_observation_archive.py` 410 + `sbx_probe.py` 453 = 2066行で、baseline 2068行から2行減少した。
+圧縮記法、型・コメント・検査の削除は使っていない。
+
+canonical fixtureのmanifest SHA-256は引き続き
+`3f7a5067ccaa7e510bcbec1d001a68c1e380abd6f7aa1f9f13cdcb3a6d3df2ff`であり、raw bytes、filename、
+hash、byte count、schema、reason ID、truth domain、actor/provenance、non-authorizing flagsは不変である。
+focused suiteは131 passed、全体pytestは713 passed、1 live opt-in skip、`ruff check .`は成功した。
+残した重複は、同じvalidatorをreport生成時とarchive snapshot生成時に呼ぶ二つの防御層と、archive固有の
+dirfd/O_NOFOLLOW/fsync/no-replace処理だけである。`worker_archive.py`と`validation_archive.py`は変更していない。
+live `sbx`、sandbox、Codex/OpenCode、OracleProvider、外部modelは起動していない。
+
+2026-08-31 11:34:27Zの追加auditでは、public reason allowlist、exact provenance element type、
+child dirfd close、mode/owner helperを単一正本へ固定した。artifact provenanceはvalidated snapshotの
+timestamp/truth domainを直接使い、manifest組立て中の重複public変換を除去した。最終gate前のfocused suiteは
+137 passedで、`wc -l`は`sbx_observation.py` 465 + `sbx_observation_payload.py` 756 +
+`sbx_observation_archive.py` 392 + `sbx_probe.py` 453 = 2066行、baselineから2行減少した。
+旧real archiveは書き換えず、current-schema replayをhistorical importとして扱わない。live `sbx`、sandbox、
+Codex/OpenCode、OracleProvider、外部modelは起動していない。
+
+2026-08-31 11:41:49Zの最終同一snapshotでは、指定focused suiteが`137 passed in 0.90s`、
+全体pytestが`719 passed, 1 skipped in 37.01s`だった。skipは
+`ORACLE_LAB_RUN_LIVE_AGENT_TESTS=1`を要求する明示live-agent opt-inだけである。
+`ruff format --check .`、`ruff check .`、ExecPlan validator、`git diff --check`も成功し、
+二系統の独立read-only auditは残存P0/P1なしと判定した。
+
+2026-08-31 11:46:51Zに最後の重複type gateをpayload builderへ一本化した後も、canonical manifest hash、
+arbitrary Protocol非実行、forged real/provenance/argv拒否のfocused 137 testsは全件成功した。
+最終production LOCは465 + 756 + 389 + 453 = 2063行で、baseline 2068行から5行減少した。
 
 ## Context and Orientation
 
@@ -591,6 +780,16 @@ brokerがtimeout、output limit、nonzero worker exit、workspace quiescence不�
 Human gateも作成しなければ合格とする。synthetic fixtureのpassing receiptはproduction routerを
 有効化できず、実tool domainの観測としてarchiveされてはならない。
 
+read-only `sbx` observationは明示gateなしにsubprocessを起動せず、gateありでもargvの第2要素が
+`version`、`ls`、`inspect`以外ならテストで失敗しなければならない。任意のinjected runnerが
+`production`を自己申告してもreal truth domainを発行できず、requested/returned argv不一致、
+schema drift、name-selected view不整合は`incomplete`としてfail closedする。reportは`passed`を受理せず、
+`IsolationAttestation`をimportまたは生成しない。
+
+observation archiveはexact argv/stdout/stderrを0600で保持し、public JSONとmanifest本体へraw値を
+埋め込まず、version/inventory/name-selected inspectをsource operation IDsへ結ぶ。symlink ancestor、existing final、
+commit race、unsafe permissions、atomic no-replace非対応ではcanonical archiveを生成しなければ合格とする。
+
 ## Idempotence and Recovery
 
 worker task、candidate patch、approval、application、validationにはそれぞれ安定した
@@ -697,6 +896,24 @@ readiness統合後の同一スナップショットでは、focused readiness/CL
 `95 passed, 1 skipped`、コミット前に再実行した全体pytestが`644 passed, 1 skipped in 46.86s`だった。`ruff format --check .`は
 `117 files already formatted`、`ruff check .`、compileall、ExecPlan validator、`git diff --check`は成功した。
 skipはoperator opt-in前のlive-agent gateだけである。
+
+2026-08-31 08:32:13Zのread-only observation hardeningでは次を追加した。
+
+    src/oracle_lab/sbx_observation.py
+    src/oracle_lab/sbx_observation_archive.py
+    src/oracle_lab/sbx_observation_payload.py
+    src/oracle_lab/sbx_probe.py
+    tests/test_sbx_observation.py
+    tests/test_sbx_observation_archive.py
+    tests/test_sbx_probe.py
+
+`oracle worker isolation probe --observe-read-only-control-plane`はservice/EventStoreを生成せず、
+fixed read-only argvだけを実行する。実probe `obs_f58ae6caf1564d198feb8d8c7cfed1b6`のarchiveは
+`/Users/annenpolka/.oracle_lab/sbx-observations/`にあり、manifest SHA-256は
+`b46838075c9851fa6744f221e921f6e1140680501daf29b5970bce2b0eee3049`、raw artifactは6件で全て
+0600、inventoryは空だった。focused security suiteは`240 passed, 1 skipped in 2.47s`、全体pytestは
+`683 passed, 1 skipped in 38.12s`だった。`ruff format --check .`は`123 files already formatted`、
+`ruff check .`、compileall、ExecPlan validator、`git diff --check`は成功した。
 
 未完了のartifactはproduction conformance receiptとlive smoke archiveである。現行の不足証拠を
 fixtureやHost推論で補わず、workspace quiescence、guest Git control、data-plane network/credential、
