@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -115,7 +117,7 @@ def test_root_and_nested_help_expose_the_complete_control_plane(
     assert "bundle" in export.output and "transcript" in export.output and "corpus" in export.output
     assert "trace" in provenance.output and "event" in provenance.output
     assert "exact" in replay.output and "host" in replay.output
-    assert "enqueue" in worker.output and "patch" in worker.output and "status" in worker.output
+    assert all(command in worker.output for command in ("enqueue", "patch", "readiness", "status"))
     assert "repository-edit" in worker_enqueue.output
     for command in ("show", "approve", "reject", "status"):
         assert command in worker_patch.output
@@ -253,3 +255,68 @@ def test_run_until_human_forwards_the_policy_stop_flag(
         (),
         {"until_human": True, "max_jobs": 7},
     )
+
+
+def test_worker_readiness_is_service_less_and_reports_blocked(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    agents_config = tmp_path / "agents.toml"
+    agents_config.write_text(
+        '[router]\nenabled = false\nisolation_backend = "disabled"\n',
+        encoding="utf-8",
+    )
+
+    def forbidden_service() -> object:
+        raise AssertionError("readiness initialized the Oracle Lab service")
+
+    monkeypatch.setattr(cli, "_service_factory", forbidden_service)
+
+    result = CliRunner().invoke(
+        cli.app,
+        ["worker", "readiness", "--agents-config", str(agents_config)],
+    )
+
+    assert result.exit_code == 1, result.output
+    document = json.loads(result.output)
+    assert document["status"] == "blocked"
+    assert document["ready"] is False
+    assert document["safe_to_start_worker"] is False
+
+
+def test_worker_readiness_cli_redacts_valid_toml_scalar_errors(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    secret = "operator-secret-must-not-appear"
+    agents_config = tmp_path / "agents.toml"
+    agents_config.write_text(
+        "\n".join(
+            (
+                "[router]",
+                "enabled = true",
+                "",
+                "[workers.codex]",
+                "enabled = true",
+                'adapter = "codex"',
+                f"timeout_seconds = {json.dumps(secret)}",
+            )
+        ),
+        encoding="utf-8",
+    )
+
+    def forbidden_service() -> object:
+        raise AssertionError("readiness initialized the Oracle Lab service")
+
+    monkeypatch.setattr(cli, "_service_factory", forbidden_service)
+
+    result = CliRunner().invoke(
+        cli.app,
+        ["worker", "readiness", "--agents-config", str(agents_config)],
+    )
+
+    assert result.exit_code == 1, result.output
+    assert secret not in result.output
+    document = json.loads(result.output)
+    assert document["status"] == "failed"
+    assert document["checks"][0]["reason_id"] == "agents_config_invalid"

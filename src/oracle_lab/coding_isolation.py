@@ -43,6 +43,19 @@ REQUIRED_ISOLATION_CAPABILITIES = frozenset(
         "bounded_workspace_export",
     }
 )
+
+# A static readiness report may expose these stable identifiers, but only a
+# measured production conformance run can remove them.  Keeping the registry at
+# the isolation-contract layer prevents the CLI diagnosis and the broker's
+# fail-closed guard from drifting apart.
+PRODUCTION_ISOLATION_EVIDENCE_BLOCKERS: tuple[str, ...] = (
+    "workspace_quiescence",
+    "guest_git_control_integrity",
+    "data_plane_network_and_credential_enforcement",
+    "actual_template_instance_identity",
+    "sandbox_ownership",
+    "profile_workspace_binding",
+)
 SAFE_ISOLATED_ENVIRONMENT_NAMES = frozenset(
     {"COLORTERM", "LANG", "LC_ALL", "LC_CTYPE", "NO_COLOR", "TERM"}
 )
@@ -470,6 +483,7 @@ def receipt_sha256(receipt: Mapping[str, Any]) -> str:
 
 
 __all__ = [
+    "PRODUCTION_ISOLATION_EVIDENCE_BLOCKERS",
     "REQUIRED_ISOLATION_CAPABILITIES",
     "SAFE_ISOLATED_ENVIRONMENT_NAMES",
     "CodingIsolationError",

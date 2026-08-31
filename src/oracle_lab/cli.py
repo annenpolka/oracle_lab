@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import json
+import os
 from collections.abc import Callable
+from pathlib import Path
 from typing import Annotated, Any
 
 import typer
@@ -11,6 +13,7 @@ import typer
 from oracle_lab.events import Actor, ActorKind
 from oracle_lab.jsonutil import json_default
 from oracle_lab.services import OracleLabService, ServiceError
+from oracle_lab.worker_readiness import inspect_worker_readiness
 
 app = typer.Typer(no_args_is_help=True, help="Event-driven R1 exploration and curation")
 session_app = typer.Typer(no_args_is_help=True, help="Create, inspect, and branch sessions")
@@ -48,11 +51,20 @@ def set_service_factory(factory: Callable[[], OracleLabService]) -> None:
 
 @app.callback()
 def root(context: typer.Context) -> None:
-    context.obj = {"service": _service_factory()}
+    # Keep control-plane diagnostics side-effect free.  Commands that need the
+    # durable service initialize it on first use through ``_service`` instead
+    # of creating the database, archives, and worker router for every help or
+    # readiness invocation.
+    context.obj = {"service": None}
 
 
 def _service(context: typer.Context) -> OracleLabService:
-    return context.find_root().obj["service"]
+    root_context = context.find_root()
+    service = root_context.obj["service"]
+    if service is None:
+        service = _service_factory()
+        root_context.obj["service"] = service
+    return service
 
 
 def _emit(value: Any) -> None:
@@ -404,6 +416,29 @@ def worker_enqueue_repository_edit(
 @worker_app.command("status")
 def worker_status(context: typer.Context, task_event_id: str) -> None:
     _call(_service(context).worker_task_status, task_event_id)
+
+
+@worker_app.command("readiness")
+def worker_readiness(
+    agents_config: Annotated[
+        str | None,
+        typer.Option(
+            "--agents-config",
+            help="Path to agents.toml (defaults to ORACLE_LAB_CONFIG/agents.toml)",
+        ),
+    ] = None,
+) -> None:
+    """Report static coding-worker prerequisites without starting a worker."""
+
+    path = (
+        Path(agents_config)
+        if agents_config is not None
+        else Path(os.environ.get("ORACLE_LAB_CONFIG", "config")) / "agents.toml"
+    )
+    report = inspect_worker_readiness(path)
+    _emit(report.to_dict())
+    if not report.ready:
+        raise typer.Exit(code=1)
 
 
 @worker_patch_app.command("show")

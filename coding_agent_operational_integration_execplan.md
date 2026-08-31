@@ -58,6 +58,12 @@ candidate patchを確認し、人間承認後にsource-independent standalone st
 - [x] (2026-08-31 03:46:21Z) 標準service factoryから隔離brokerを配線し、router attestation失敗時はEventStore生成やmodel起動より前にfail closedするようにした。live testはopt-in、digest固定template、exact host listの全gateがない限りsubprocess前にskipする。
 - [x] (2026-08-31 04:12:26Z) timeout、output limit、nonzero exitをcleanup-confirmed構造化失敗として分離し、workspaceはexportせず、bounded raw stdout/stderrとsandbox/attestationだけをwrite-once archiveへ保存する経路を実装した。
 - [x] (2026-08-31 04:14:06Z) ExecPlan validator、Ruff format/check、compileall、全体pytestを同一スナップショットで通過させた。633 passed、1 live opt-in skipで、Docker sandboxおよび実modelは起動していない。
+- [x] (2026-08-31 05:25:22Z) service、EventStore、broker subprocess、sandbox、agent/modelを起動しない `oracle worker readiness` を追加し、checked-in configをstable reason IDと6個のproduction evidence blockerで診断できるようにした。
+- [x] (2026-08-31 05:25:22Z) Docker公式standalone `sbx v0.39.0`を導入し、Docker Sandboxes serviceのhost-side OAuth、Apple virtualization、daemon、storage、version一致、認証を `sbx diagnose -o json` の12 checksで確認し、global network policyを`deny-all`へ初期化した。
+- [x] (2026-08-31 05:25:22Z) 外部modelを呼ばず、一時fixture repositoryだけを`sbx create --clone shell`へ渡す実microVM probeを行った。source mountのread-only、private clone、instance UUID、data-plane default deny、kit allow、cleanup後のsandbox消滅を実測した。
+- [x] (2026-08-31 05:46:32Z) ExecPlan validator、Ruff format/check、compileall、全体pytestをreadiness統合後の同一スナップショットで通過させた。644 passed、1 live opt-in skipで、実Codex/OpenCode/Oracle modelは起動していない。
+- [x] (2026-08-31 06:09:46Z) 2回のtimeout後、Humanのaction-time confirmationを受けてfresh `sbx secret set openai --oauth` flowを完了した。CLIはglobal scopeへの保存を報告し、`sbx secret ls`は`openai (oauth configured)`を返した。token値は読み出していない。
+- [x] (2026-08-31 06:14:58Z) コミット前の同一スナップショットでExecPlan validator、Ruff format/check、compileall、全体pytest、`git diff --check`を再実行した。644 passed、1 live opt-in skipで、実agent/modelは起動していない。
 - [ ] (2026-08-31 03:46:21Z) security auditで発見したworkspace quiescence、guest Git control、data-plane network/credential、actual template instance、sandbox ownership、profile/workspace bindingの証拠不足を解消する。解消まではproduction `sbx` bindingを明示的に拒否し、実agent smokeを実行しない。
 
 ## Surprises & Discoveries
@@ -179,6 +185,21 @@ candidate patchを確認し、人間承認後にsource-independent standalone st
 - Observation: 実行前のbroker/template/policy identity検査だけでは、run中の差し替えを古いattestationで受け入れ得る。
   Evidence: sandbox cleanup確認後、成功結果または構造化失敗を返す直前にexecutable hash、client/server version、template inventory identity、global policyを再測定し、drift時は結果を受理しない。
 
+- Observation: Typer root callbackで全commandの前に`OracleLabService.default()`を生成すると、readiness診断だけでもruntime home、DB、router bindへ進む。
+  Evidence: service生成を最初のservice-backed commandまで遅延し、`oracle worker readiness`がservice factory、subprocess、broker bindを呼ばない回帰試験を追加した。
+
+- Observation: 実standalone `sbx v0.39.0`のcontrol-plane出力は、staged synthetic fixtureの同版grammarと一致しない。
+  Evidence: 実`sbx version`は単一の`sbx version: v0.39.0 <commit>`行であり、global policy JSONは`policy_name`、sandbox policy JSONは`policy_id`に加えて`origin=scoped`と`sandbox_id`を返した。現fixtureのclient/server二行grammarとstrict policy decoderをproduction evidenceへ昇格できない。
+
+- Observation: global `deny-all`はbuilt-in kitのsandbox-scoped allowを消去する設定ではない。
+  Evidence: no-model shell fixtureのeffective policyは`openrouter.ai` allowを含み、guest data-planeで`https://example.com`はproxyの403/default deny、`https://openrouter.ai`は200となった。exact allowlistはglobal preset名ではなくcreated sandboxの実policyと通信結果で検証する必要がある。
+
+- Observation: 実`sbx create --clone`はsourceを`/run/sandbox/source`へread-only mountし、private cloneとinstance UUIDを作るが、`sbx ls --json`はtemplate identityを返さない。
+  Evidence: guest-only fileとlocal Git configはHost fixtureへ現れず、cleanup後はsandboxと一時remoteが消滅した。一方、template inventoryはshort image ID、repository、tag、flavor、時刻、sizeだけでregistry digestを持たず、instance一覧にもtemplate fieldがなかった。
+
+- Observation: `sbx diagnose`全check成功はHost前提の確認であり、Oracle Labのproduction attestationではない。
+  Evidence: 実機では12 checksがpassしたが、workspace quiescence、guest Git control receipt、credential non-disclosure、instance template digest、ownership race、profile/input bindingは診断対象に含まれない。
+
 ## Decision Log
 
 - Decision: コーディングエージェントは常に `worker` actorとして記録する。
@@ -293,6 +314,18 @@ candidate patchを確認し、人間承認後にsource-independent standalone st
   Rationale: 実行前に固定したattestationと、実際にrunを完了したruntime identityのTOCTOUを閉じるため。
   Date/Author: 2026-08-31 04:12:26Z / Post-cleanup identity audit
 
+- Decision: coding-worker readinessはread-only control-plane observationとし、service/EventStore生成、profile有効化、production attestation発行、sandbox作成、agent/model起動を行わない。
+  Rationale: 実行可能性の観測を実行権限や隔離証明へ昇格させず、未完成のproduction bindingを安全に診断するため。
+  Date/Author: 2026-08-31 05:25:22Z / Operational readiness
+
+- Decision: static readiness、明示承認されたno-model実`sbx` conformance、外部modelを伴うlive smokeを独立した三つのgateにする。
+  Rationale: ローカル準備、OS隔離の実測、外部通信と費用へのHuman同意は相互に代替できないため。
+  Date/Author: 2026-08-31 05:25:22Z / Operational readiness
+
+- Decision: installed `sbx`とHost診断が成功しても、実CLI protocolと6 blockerを解消するまではchecked-in worker設定とproduction guardを変更しない。
+  Rationale: availability、ログイン、preset名、synthetic fixtureを未測定capabilityの証明として扱わないため。
+  Date/Author: 2026-08-31 05:25:22Z / Operational readiness
+
 ## Outcomes & Retrospective
 
 このセクションは各マイルストーン終了時に更新する。完了時には、標準CLIから
@@ -338,6 +371,24 @@ security auditで、detached descendantが生存した状態のexport、guest `.
 sentinelだけによるdata-plane/credential capabilityの過大宣言、template instance identity、sandbox
 ownership race、profile/workspace under-bindingが見つかった。安全側の停止点としてproduction bindingを
 再び明示的fail closedにし、実Codex/OpenCode smokeは未実施のまま残す。当初の最終目的はまだ未達である。
+
+2026-08-31 05:25:22Z時点で、初回実行に必要なstatic configとbroker file identityを副作用なく列挙する
+`oracle worker readiness`を追加した。Hostにはstandalone `sbx v0.39.0`を導入し、Docker Sandboxes
+serviceのOAuth、virtualization、daemon、storage、version、authenticationの公式diagnosticは全件passした。
+global network policyは`deny-all`で初期化し、no-model shell microVMを一時fixture repositoryだけで
+作成・削除した。Codex用OpenAI proxy credentialのOAuthは同意前timeoutにより未設定で、tokenは保存されていない。
+
+この実probeによりsource read-only mount、private clone、data-plane default deny、sandbox UUID、cleanupは
+観測できたが、同時に実CLI grammarとsynthetic decoderの差、built-in kit allow、instance template digest
+欠落を確認した。readiness reportは6 blockerを理由に`ready=false` / `safe_to_start_worker=false`のままで、
+production attestationや実Codex/OpenCode連携の完了を意味しない。Oracle、coding agent、外部modelは
+呼び出していない。
+
+2026-08-31 06:09:46Z時点で、Humanのaction-time confirmation後にfresh
+`sbx secret set openai --oauth` flowを完了した。CLIはtoken managerの更新とglobal scopeへの保存を報告し、
+値を読み出さない`sbx secret ls`確認は`openai (oauth configured)`を返した。Host Codexも
+`codex login status`でChatGPT loginを報告した。このcredential準備はproduction attestation、profile有効化、
+live-agent smokeの代替ではなく、6 blockerと`safe_to_start_worker=false`は維持する。
 
 ## Context and Orientation
 
@@ -423,6 +474,7 @@ OSレベルのworker隔離が実装されるまではlive testはopt-in時もski
     src/oracle_lab/config.py
     src/oracle_lab/events.py
     src/oracle_lab/agent_adapters.py
+    src/oracle_lab/worker_readiness.py
     src/oracle_lab/git_control.py
     src/oracle_lab/host_provider.py
     src/oracle_lab/jobs.py
@@ -436,8 +488,12 @@ OSレベルのworker隔離が実装されるまではlive testはopt-in時もski
     src/oracle_lab/patches.py
     tests/test_agent_adapter_runtime.py
     tests/test_agent_adapter_service_integration.py
-    tests/test_agent_patch_pipeline.py
-    tests/test_agent_patch_security.py
+    tests/test_agent_adapter_repository_edit.py
+    tests/test_candidate_patches.py
+    tests/test_coding_isolation_contract.py
+    tests/test_docker_sbx_isolation.py
+    tests/test_service_isolation_wiring.py
+    tests/test_worker_readiness.py
     tests/test_live_agent_opt_in.py
 
 各マイルストーンの実装前に `Progress` を更新し、focused testsを実行する。
@@ -447,8 +503,13 @@ OSレベルのworker隔離が実装されるまではlive testはopt-in時もski
       uv run pytest \
       tests/test_agent_adapter_runtime.py \
       tests/test_agent_adapter_service_integration.py \
-      tests/test_agent_patch_pipeline.py \
-      tests/test_agent_patch_security.py -q
+      tests/test_agent_adapter_repository_edit.py \
+      tests/test_candidate_patches.py \
+      tests/test_coding_isolation_contract.py \
+      tests/test_docker_sbx_isolation.py \
+      tests/test_service_isolation_wiring.py \
+      tests/test_worker_readiness.py \
+      tests/test_live_agent_opt_in.py -q
 
 実装途中では、まだ作成されていないテストファイルをcommandから一時的に外してよいが、
 停止時に `Progress` へ残作業を明記する。focused testsの期待結果は全件passであり、skipは
@@ -606,10 +667,41 @@ synthetic lifecycle testはbackend、receipt、全capability evidenceを`synthet
 production `SubprocessCommandRunner.bind()`は`sbx` subprocess前にfail closedした。Docker sandbox、
 Codex/OpenCode、OracleProvider、外部modelはいずれも起動していない。
 
+2026-08-31 05:25:22Zのoperational-readiness作業では次を追加した。
+
+    src/oracle_lab/worker_readiness.py
+    tests/test_worker_readiness.py
+
+`oracle worker readiness`は`config/agents.toml`とbroker executable bytesだけを読み、service、DB、archive、
+subprocess、sandbox、modelを起動しない。実Host観測（`truth_domain=real`）ではstandalone
+`sbx v0.39.0`、Apple virtualization、daemon、Docker service OAuth、storage、version一致を確認し、
+`sbx diagnose -o json`は12 passed、0 failed、0 skippedだった。global network policyは`deny-all`である。
+
+一時fixture repositoryを使ったguest観測（`truth_domain=sandbox`）では、source mount write不可、private
+cloneへのfile/Git config変更、`example.com`への403 default deny、kit-scoped `openrouter.ai`への200、
+cleanup後の`sbx ls --json`空配列を確認した。sandbox名は`oracle-lab-preflight-xsrxk3`、instance UUIDは
+`2d996d24-d758-455d-8d08-36d082372f82`だった。sandboxとfixture directoryは削除し、sandboxdも停止した。
+このmanual development probeはOracle Labのproduction conformance receiptまたはworker archiveではなく、
+実model、Codex/OpenCode、OracleProviderを呼んでいない。
+
+Codex用の`sbx secret set openai --oauth`は、永続的なOAuth許可の同意画面でHumanのaction-time
+confirmationを待つ間に2回timeoutした。`sbx secret ls`に保存済みsecretはなく、tokenは保存されていない。
+次回はHuman確認後にfresh OAuth flowを開始する。Docker serviceへのログイン成功およびdiagnose成功は、
+この未完了credentialやOracle Lab production attestationを代替しない。
+
+2026-08-31 06:09:46Zのfresh OAuth flowではcallbackが成功し、CLIがglobal scopeへのtoken保存を報告した。
+値を読み出さずに`sbx secret ls`を実行し、`openai (oauth configured)`だけを確認した。前段落のtimeoutは
+履歴として保持し、credential準備の完了をproduction conformance receiptとは扱わない。
+
+readiness統合後の同一スナップショットでは、focused readiness/CLI/isolation/live-gate suiteが
+`95 passed, 1 skipped`、コミット前に再実行した全体pytestが`644 passed, 1 skipped in 46.86s`だった。`ruff format --check .`は
+`117 files already formatted`、`ruff check .`、compileall、ExecPlan validator、`git diff --check`は成功した。
+skipはoperator opt-in前のlive-agent gateだけである。
+
 未完了のartifactはproduction conformance receiptとlive smoke archiveである。現行の不足証拠を
 fixtureやHost推論で補わず、workspace quiescence、guest Git control、data-plane network/credential、
-actual template instance identityを実測できた後にのみ、このセクションへ実run ID、CLI version、
-archive hashを追記する。
+actual template instance identity、sandbox ownership、profile/workspace bindingを実測できた後にのみ、
+このセクションへ実run ID、CLI version、archive hashを追記する。
 
 ## Interfaces and Dependencies
 

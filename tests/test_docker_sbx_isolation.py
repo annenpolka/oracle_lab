@@ -13,6 +13,7 @@ import pytest
 import oracle_lab.docker_sbx_isolation as sbx_module
 from oracle_lab.agent_adapters import WorkerExecutionProfile
 from oracle_lab.coding_isolation import (
+    PRODUCTION_ISOLATION_EVIDENCE_BLOCKERS,
     REQUIRED_ISOLATION_CAPABILITIES,
     CodingIsolationError,
     IsolationRunFailed,
@@ -334,9 +335,11 @@ def test_production_bind_fails_before_any_sbx_process_or_attestation(tmp_path: P
 
     with pytest.raises(
         CodingIsolationError, match="production Docker sbx attestation is unavailable"
-    ):
+    ) as captured:
         broker.bind(_profile())
 
+    for blocker in PRODUCTION_ISOLATION_EVIDENCE_BLOCKERS:
+        assert blocker in str(captured.value)
     assert not state_root.exists()
 
 

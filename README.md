@@ -188,6 +188,52 @@ They never activate the standard service, count as a real tool observation, or
 justify a live coding-agent run. Failed synthetic worker runs (timeout, output
 limit, or nonzero exit) are cleanup-only and never export a candidate workspace.
 
+### Coding-worker readiness
+
+Inspect the checked-in worker configuration without creating the Oracle Lab
+database, binding the isolation broker, starting a sandbox, or invoking an
+agent/model:
+
+```sh
+uv run oracle worker readiness
+```
+
+Use `--agents-config /absolute/path/to/agents.toml` for an operator-owned
+configuration outside the target repository. The command emits stable JSON and
+intentionally exits non-zero while blocked. It can confirm static prerequisites
+such as an exact-host allowlist, a digest-shaped template reference, and the
+resolved broker executable hash, but it never issues production attestation or
+enables a profile.
+
+The current blocker IDs are `workspace_quiescence`,
+`guest_git_control_integrity`,
+`data_plane_network_and_credential_enforcement`,
+`actual_template_instance_identity`, `sandbox_ownership`, and
+`profile_workspace_binding`. They must be cleared by measured production
+conformance, not by changing readiness output.
+
+On Apple silicon macOS, Docker's standalone CLI is installed and initialized
+separately from the legacy `docker sandbox` plugin:
+
+```sh
+brew trust docker/tap
+brew install docker/tap/sbx
+sbx login
+sbx secret set openai --oauth
+sbx diagnose -o json
+```
+
+`sbx login` authenticates the Docker Sandboxes service; the separate
+`sbx secret set openai --oauth` flow prepares Codex's proxy-managed OpenAI
+credential in the Host keychain. Neither successful login is evidence that the
+Oracle Lab isolation contract has passed.
+
+Initialize the global network policy to `deny-all` before a no-model
+conformance sandbox if it is not already initialized. Do not treat a successful
+`sbx diagnose` as Oracle Lab attestation. Keep the checked-in worker profiles
+disabled; static readiness, a real no-model `sbx` conformance run, and a
+Human-authorized live-agent smoke are separate gates.
+
 The lightweight `direct` adapter is a separate Host-model path and does not use
 the Oracle profiles in `config/models.toml`. To enable it, the operator must set
 `router.enabled=true`, `workers.direct.enabled=true`, and explicitly configure

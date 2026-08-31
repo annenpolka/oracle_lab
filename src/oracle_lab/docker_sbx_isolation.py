@@ -36,6 +36,7 @@ from pathlib import Path
 from typing import Any, Protocol
 
 from oracle_lab.coding_isolation import (
+    PRODUCTION_ISOLATION_EVIDENCE_BLOCKERS,
     REQUIRED_ISOLATION_CAPABILITIES,
     SAFE_ISOLATED_ENVIRONMENT_NAMES,
     CodingIsolationError,
@@ -74,6 +75,11 @@ _HOST = re.compile(
     r"^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)*"
     r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$"
 )
+# This grammar is retained only for the explicitly synthetic lifecycle fixture.
+# A real standalone sbx v0.39.0 observed on 2026-08-31 prints a single
+# ``sbx version: ...`` line and exposes daemon health separately through
+# ``sbx diagnose``.  The production guard in ``bind`` must remain in place
+# until that real protocol has its own reviewed identity contract.
 _VERSION_OUTPUT = re.compile(
     rb"\AClient Version:\s{2}v(0|[1-9][0-9]*)\."
     rb"(0|[1-9][0-9]*)\.(0|[1-9][0-9]*) ([0-9a-f]{7,64})\n"
@@ -533,8 +539,8 @@ def _parse_version(raw: bytes) -> _SbxVersion:
 
 
 def _json_schema_for(version: _SbxVersion) -> str:
-    # v0.39.0 is the measured stable contract.  A future version still clears
-    # the minimum version gate, but must get a separately reviewed decoder.
+    # This is the staged synthetic v0.39 fixture contract, not production
+    # evidence.  A future or real protocol needs a separately reviewed decoder.
     if version.client[:2] != (0, 39) or version.server[:2] != (0, 39):
         raise CodingIsolationError("installed sbx JSON contract has not been reviewed")
     return "docker-sbx-0.39-json-v1"
@@ -1565,8 +1571,8 @@ class DockerSbxIsolationBroker(CodingWorkerIsolationBroker):
             or getattr(self._runner, "evidence_origin", None) != _SYNTHETIC_EVIDENCE_ORIGIN
         ):
             raise CodingIsolationError(
-                "production Docker sbx attestation is unavailable: data-plane quiescence, "
-                "guest Git isolation, and template-instance identity are not proven"
+                "production Docker sbx attestation is unavailable: "
+                + ", ".join(PRODUCTION_ISOLATION_EVIDENCE_BLOCKERS)
             )
         workspace_root, state_root = self._workspace_boundary()
         hosts = self._profile_hosts(profile)
