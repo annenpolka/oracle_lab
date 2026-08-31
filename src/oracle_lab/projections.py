@@ -1508,7 +1508,7 @@ class ProjectionManager:
 
 def default_projections() -> tuple[Projection, ...]:
     """Return fresh default projection plugins in dependency order."""
-    from oracle_lab.jobs import JobProjection
+    from oracle_lab._job_projection import JobProjection
     from oracle_lab.provenance import ProvenanceProjection
     from oracle_lab.sampling import SamplingProjection
     from oracle_lab.usage import UsageProjection

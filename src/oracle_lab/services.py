@@ -25,6 +25,7 @@ from decimal import Decimal
 from pathlib import Path, PurePosixPath
 from typing import Any
 
+from oracle_lab.artifact_manifest import artifact_manifest_view
 from oracle_lab.events import Actor, ActorKind, Event, EventType, thaw_json
 from oracle_lab.exporting import (
     export_research_bundle,
@@ -41,30 +42,10 @@ from oracle_lab.ids import new_id
 from oracle_lab.jsonutil import canonical_json, sha256_bytes, sha256_json, sha256_text
 from oracle_lab.material import is_synthetic_lineage, is_worker_lineage, material_origins
 from oracle_lab.observability import ObservabilityService
-from oracle_lab.retrieval import RetrievalDocument, RetrievalIndex
+from oracle_lab.research_read_model import ResearchCatalogReadModel
 from oracle_lab.store import EventStore
-
-_LATEX_START_RE = re.compile(
-    r"\$\$|(?<!\$)\$(?!\$)(?=[^$\n]+\$)|\\\[|\\\(|"
-    r"\\begin\s*\{[A-Za-z*]+\}|\\frac\s*\{"
-)
-_RESEARCH_WORD_RE = re.compile(r"[\w./:=°+\-]+", re.UNICODE)
-_PROMPT_ATTRACTOR_PHRASES = (
-    "証明",
-    "定理",
-    "反論",
-    "観測記録",
-    "報告書",
-    "メモ",
-    "実行",
-    "確認",
-    "疑似科学",
-    "破滅",
-    "救済",
-    "フィクション",
-    "詩",
-    "寓話",
-)
+from oracle_lab.usage_cost_read_model import UsageCostReadModel
+from oracle_lab.worker_read_model import WorkerReadModel, WorkerReadModelError
 
 
 class ServiceError(RuntimeError):
@@ -1293,53 +1274,16 @@ class OracleLabService:
         return {"task_event": task_event.to_dict(), "job": _jsonable(job)}
 
     def worker_task_status(self, task_event_id: str) -> dict[str, Any]:
-        task = self.store.require(task_event_id)
-        if task.type is not EventType.WORKER_TASK_REQUESTED:
-            raise ServiceError("event is not a worker task")
-        runs = [
-            dict(row)
-            for row in self.store.connection.execute(
-                "SELECT * FROM worker_runs WHERE task_event_id = ? ORDER BY created_at",
-                (task.id,),
-            )
-        ]
-        patches = [
-            dict(row)
-            for row in self.store.connection.execute(
-                """
-                SELECT p.* FROM candidate_patches p
-                JOIN worker_runs r ON r.run_id = p.worker_run_id
-                WHERE r.task_event_id = ? ORDER BY p.created_at
-                """,
-                (task.id,),
-            )
-        ]
-        return {"task": task.to_dict(), "runs": runs, "patches": patches}
+        try:
+            return WorkerReadModel(self.store).worker_task_status(task_event_id)
+        except WorkerReadModelError as error:
+            raise ServiceError(str(error)) from None
 
     def patch_show(self, patch_event_id: str) -> dict[str, Any]:
-        patch = self.store.require(patch_event_id)
-        if patch.type is not EventType.WORKER_PATCH_PROPOSED:
-            raise ServiceError("event is not a candidate patch")
-        row = self.store.connection.execute(
-            "SELECT * FROM candidate_patches WHERE patch_event_id = ?",
-            (patch.id,),
-        ).fetchone()
-        if row is None:
-            raise ServiceError("candidate patch projection is missing")
-        state = dict(row)
-        for field_name in ("changed_paths_json", "validation_event_ids_json"):
-            raw_value = state.get(field_name)
-            if isinstance(raw_value, str):
-                state[field_name.removesuffix("_json")] = json.loads(raw_value)
-        run = self.store.connection.execute(
-            "SELECT * FROM worker_runs WHERE run_id = ?",
-            (patch.payload["worker_run_id"],),
-        ).fetchone()
-        return {
-            "patch": patch.to_dict(),
-            "state": state,
-            "worker_run": None if run is None else dict(run),
-        }
+        try:
+            return WorkerReadModel(self.store).patch_show(patch_event_id)
+        except WorkerReadModelError as error:
+            raise ServiceError(str(error)) from None
 
     def patch_status(self, patch_event_id: str) -> dict[str, Any]:
         return self.patch_show(patch_event_id)
@@ -1486,13 +1430,7 @@ class OracleLabService:
 
     def _enforce_cost_safeguards(self, request_event: Event) -> None:
         policies = self.runtime_config.policies
-        rows = self.store.connection.execute(
-            """
-            SELECT provider_cost, created_at, session_id
-            FROM usage_records
-            WHERE kind = 'oracle' AND provider_cost IS NOT NULL
-            """
-        ).fetchall()
+        rows = UsageCostReadModel(self.store).oracle_cost_records()
         today = dt.datetime.now(dt.UTC).date()
         daily_cost = sum(
             (
@@ -2016,34 +1954,16 @@ class OracleLabService:
         return [dict(row) for row in self.store.connection.execute(sql, parameters)]
 
     def claims(self) -> list[dict[str, Any]]:
-        return self._rows("SELECT * FROM claims ORDER BY first_seen_at, id")
+        return ResearchCatalogReadModel(self.store).claims()
 
     def contradictions(self) -> list[dict[str, Any]]:
-        return [
-            event.to_dict()
-            for event in self.store.list_events(
-                event_type=[
-                    EventType.ANALYSIS_CONTRADICTION_DETECTED,
-                    EventType.ANALYSIS_NUMERIC_INCONSISTENCY,
-                ]
-            )
-            if not is_synthetic_lineage(event, self.store.get)
-        ]
+        return ResearchCatalogReadModel(self.store).contradictions()
 
     def motifs(self) -> list[dict[str, Any]]:
-        return self._rows(
-            "SELECT id, label, description, length(embedding) AS embedding_bytes "
-            "FROM motifs ORDER BY id"
-        )
+        return ResearchCatalogReadModel(self.store).motifs()
 
     def attractors(self) -> list[dict[str, Any]]:
-        return [
-            event.to_dict()
-            for event in self.store.list_events(
-                event_type=EventType.ANALYSIS_FORMAT_ATTRACTOR_DETECTED
-            )
-            if not is_synthetic_lineage(event, self.store.get)
-        ]
+        return ResearchCatalogReadModel(self.store).attractors()
 
     def prompt_attractor_statistics(
         self,
@@ -2057,136 +1977,10 @@ class OracleLabService:
             raise ServiceError("phrase must not be empty")
         if session_id is None:
             session_id, _ = self._active()
-        events = [
-            event
-            for event in self.store.list_events(session_id=session_id)
-            if not is_synthetic_lineage(event, self.store.get)
-        ]
-        by_id = {event.id: event for event in events}
-        prompt_types = {
-            EventType.HUMAN_INPUT,
-            EventType.ORACLE_CONTEXT_MESSAGE,
-            EventType.TOOL_RESULT_ADAPTED,
-        }
-
-        def exact_text(event: Event) -> str | None:
-            for key in ("text", "content"):
-                value = event.payload.get(key)
-                if isinstance(value, str):
-                    return value
-            message = event.payload.get("message")
-            if isinstance(message, Mapping) and isinstance(message.get("content"), str):
-                return str(message["content"])
-            return None
-
-        def nearest_prompt(output: Event) -> Event | None:
-            queue: list[str] = [
-                value
-                for value in (output.causation_id, output.parent_event_id)
-                if isinstance(value, str)
-            ]
-            seen: set[str] = set()
-            while queue:
-                event_id = queue.pop(0)
-                if event_id in seen:
-                    continue
-                seen.add(event_id)
-                candidate = by_id.get(event_id)
-                if candidate is None:
-                    continue
-                if candidate.type in prompt_types and exact_text(candidate) is not None:
-                    return candidate
-                queue.extend(
-                    value
-                    for value in (candidate.parent_event_id, candidate.causation_id)
-                    if isinstance(value, str) and value not in seen
-                )
-            return None
-
-        attractors_by_output: dict[str, set[str]] = {}
-        for event in events:
-            if event.type is not EventType.ANALYSIS_FORMAT_ATTRACTOR_DETECTED:
-                continue
-            attractor = event.payload.get("attractor")
-            if not isinstance(attractor, str):
-                continue
-            raw_sources = event.payload.get("source_event_ids", ())
-            source_ids = (
-                [value for value in raw_sources if isinstance(value, str)]
-                if isinstance(raw_sources, Sequence)
-                and not isinstance(raw_sources, (str, bytes, bytearray))
-                else []
-            )
-            if isinstance(event.causation_id, str):
-                source_ids.append(event.causation_id)
-            for source_id in source_ids:
-                source = by_id.get(source_id)
-                if source is not None and source.type is EventType.ORACLE_OUTPUT:
-                    attractors_by_output.setdefault(source.id, set()).add(attractor)
-
-        pairs: list[dict[str, Any]] = []
-        for output in events:
-            if output.type is not EventType.ORACLE_OUTPUT:
-                continue
-            prompt_event = nearest_prompt(output)
-            if prompt_event is None or (prompt_text := exact_text(prompt_event)) is None:
-                continue
-            pairs.append(
-                {
-                    "prompt_event_id": prompt_event.id,
-                    "prompt_event_type": prompt_event.type.value,
-                    "exact_prompt": prompt_text,
-                    "prompt_sha256": sha256_text(prompt_text),
-                    "output_event_id": output.id,
-                    "attractors": sorted(attractors_by_output.get(output.id, set())),
-                }
-            )
-
-        phrases = (
-            [phrase]
-            if phrase is not None
-            else sorted(
-                {
-                    *_PROMPT_ATTRACTOR_PHRASES,
-                    *(
-                        token
-                        for pair in pairs
-                        for token in _RESEARCH_WORD_RE.findall(str(pair["exact_prompt"]))
-                    ),
-                }
-            )
+        return ResearchCatalogReadModel(self.store).prompt_attractor_statistics(
+            session_id,
+            phrase=phrase,
         )
-        statistics: list[dict[str, Any]] = []
-        for candidate_phrase in phrases:
-            matching = [pair for pair in pairs if candidate_phrase in str(pair["exact_prompt"])]
-            if not matching:
-                continue
-            attractor_counts: dict[str, int] = {}
-            for pair in matching:
-                for attractor in pair["attractors"]:
-                    attractor_counts[attractor] = attractor_counts.get(attractor, 0) + 1
-            denominator = len(matching)
-            statistics.append(
-                {
-                    "phrase": candidate_phrase,
-                    "prompt_count": len({str(pair["prompt_event_id"]) for pair in matching}),
-                    "output_count": denominator,
-                    "attractor_counts": dict(sorted(attractor_counts.items())),
-                    "attractor_probability": {
-                        key: count / denominator for key, count in sorted(attractor_counts.items())
-                    },
-                    "prompt_event_ids": list(
-                        dict.fromkeys(str(pair["prompt_event_id"]) for pair in matching)
-                    ),
-                    "output_event_ids": [str(pair["output_event_id"]) for pair in matching],
-                }
-            )
-        return {
-            "session_id": session_id,
-            "pair_count": len(pairs),
-            "phrase_statistics": statistics,
-            "pairs": pairs,
-        }
 
     def contradiction_mechanism_branches(
         self, session_id: str | None = None
@@ -2262,62 +2056,10 @@ class OracleLabService:
             raise ServiceError("word_count must be positive")
         if session_id is None:
             session_id, _ = self._active()
-        results: list[dict[str, Any]] = []
-        seen: set[tuple[str, int]] = set()
-        attractors = self.store.list_events(
-            session_id=session_id,
-            event_type=EventType.ANALYSIS_FORMAT_ATTRACTOR_DETECTED,
+        return ResearchCatalogReadModel(self.store).words_before_latex_attractors(
+            session_id,
+            word_count=word_count,
         )
-        for attractor in attractors:
-            if is_synthetic_lineage(attractor, self.store.get):
-                continue
-            markers = tuple(
-                marker for marker in attractor.payload.get("markers", ()) if isinstance(marker, str)
-            )
-            if attractor.payload.get("attractor") != "latex_notation" and not any(
-                _LATEX_START_RE.search(marker) for marker in markers
-            ):
-                continue
-            raw_sources = attractor.payload.get("source_event_ids", ())
-            source_ids = [item for item in raw_sources if isinstance(item, str)]
-            if not source_ids and attractor.causation_id is not None:
-                source_ids = [attractor.causation_id]
-            for source_id in source_ids:
-                source = self.store.require(source_id)
-                if is_synthetic_lineage(source, self.store.get):
-                    continue
-                text = next(
-                    (
-                        value
-                        for key in ("raw_text", "content", "text", "output")
-                        if isinstance((value := source.payload.get(key)), str)
-                    ),
-                    "",
-                )
-                display_math_open = False
-                for match in _LATEX_START_RE.finditer(text):
-                    if match.group(0) == "$$":
-                        if display_math_open:
-                            display_math_open = False
-                            continue
-                        display_math_open = True
-                    identity = (source.id, match.start())
-                    if identity in seen:
-                        continue
-                    seen.add(identity)
-                    words = _RESEARCH_WORD_RE.findall(text[: match.start()])[-word_count:]
-                    results.append(
-                        {
-                            "attractor_event_id": attractor.id,
-                            "source_event_id": source.id,
-                            "branch_id": source.branch_id,
-                            "latex_marker": match.group(0),
-                            "offset": match.start(),
-                            "words": words,
-                            "prefix": " ".join(words),
-                        }
-                    )
-        return results
 
     def fork_before_attractor(
         self, attractor_event_id: str, title: str | None = None
@@ -2364,56 +2106,12 @@ class OracleLabService:
         self, query: str, *, semantic: bool = False, limit: int = 20
     ) -> list[dict[str, Any]]:
         session_id, _ = self._active()
-        events = [
-            event
-            for event in self.store.list_events(session_id=session_id)
-            if not is_synthetic_lineage(event, self.store.get)
-        ]
-        index = RetrievalIndex.from_events(events)
-        motif_rows = self._rows(
-            """
-            SELECT m.id, m.label, m.description, m.embedding,
-                   em.event_id AS source_event_id,
-                   e.session_id, e.branch_id, e.created_at
-            FROM motifs m
-            JOIN event_motifs em ON em.motif_id = m.id
-            JOIN events e ON e.id = em.event_id
-            WHERE e.session_id = ?
-            ORDER BY e.created_at, em.event_id, m.id
-            """,
-            (session_id,),
+        return ResearchCatalogReadModel(self.store).search(
+            session_id,
+            query,
+            semantic=semantic,
+            limit=limit,
         )
-        motif_records: dict[str, dict[str, Any]] = {}
-        for motif in motif_rows:
-            motif_id = str(motif["id"])
-            record = motif_records.setdefault(
-                motif_id,
-                {**motif, "source_event_ids": []},
-            )
-            source_event_id = motif.get("source_event_id")
-            if isinstance(source_event_id, str):
-                record["source_event_ids"].append(source_event_id)
-        for motif in motif_records.values():
-            motif["source_event_ids"] = list(dict.fromkeys(motif["source_event_ids"]))
-            index.add(RetrievalDocument.from_motif(motif))
-        hits = (
-            index.semantic_search(query, limit=limit)
-            if semantic
-            else index.by_text_substring(query, case_sensitive=False)
-        )
-        return [
-            {
-                "document_id": hit.document.id,
-                "event_id": hit.document.metadata.get("source_event_id", hit.event_id),
-                "kind": hit.document.kind,
-                "source_event_id": hit.document.metadata.get("source_event_id"),
-                "source_event_ids": list(hit.document.metadata.get("source_event_ids", ())),
-                "score": hit.score,
-                "matched_by": hit.matched_by,
-                "text": hit.document.text,
-            }
-            for hit in hits[:limit]
-        ]
 
     def origin(self, query: str) -> dict[str, Any] | None:
         direct = self.store.get(query)
@@ -2981,44 +2679,13 @@ class OracleLabService:
             )
         return self._tool_broker
 
-    @staticmethod
-    def _mechanical_tool_result_content(request: Any, result_event: Event) -> str:
-        """Format a tool observation without interpretive Host prose."""
-
-        tool_input = thaw_json(request.input)
-        command = tool_input.get("command")
-        expression = tool_input.get("expression")
-        url = tool_input.get("url")
-        if isinstance(command, str):
-            invocation = command
-        elif isinstance(expression, str):
-            invocation = f"{request.tool} {expression}"
-        elif isinstance(url, str) and request.tool == "web_verify":
-            invocation = f"GET {url}"
-        else:
-            invocation = f"{request.tool} {canonical_json(tool_input)}"
-        output = result_event.payload.get("output", "")
-        return f"$ {invocation}\n{output if isinstance(output, str) else str(output)}"
-
-    @staticmethod
-    def _tool_loop_signature(request: Any, result_event: Event) -> str:
-        """Hash semantic tool input/result fields, excluding event identities."""
-
-        return sha256_json(
-            {
-                "tool": request.tool,
-                "execution": request.execution.value,
-                "input": thaw_json(request.input),
-                "status": result_event.payload.get("status"),
-                "output": result_event.payload.get("output"),
-                "error": result_event.payload.get("error"),
-                "exit_code": result_event.payload.get("exit_code"),
-                "truth_domain": result_event.payload.get("truth_domain"),
-            }
-        )
-
     def _execute_tool_job(self, job: Any) -> Event:
-        from oracle_lab.tooling import ToolRequest, ToolStatus
+        from oracle_lab.tooling import (
+            ToolRequest,
+            ToolStatus,
+            mechanical_tool_result_content,
+            tool_loop_signature,
+        )
         from oracle_lab.usage import UsageService
 
         request_event = self.store.require(str(job.payload["request_event_id"]))
@@ -3151,7 +2818,7 @@ class OracleLabService:
                 ),
                 None,
             )
-            signature = self._tool_loop_signature(request, result_event)
+            signature = tool_loop_signature(request, result_event)
             if adapter is None:
                 depth, budget = self._automation_state(request_event)
                 if depth >= self.runtime_config.policies.max_auto_depth:
@@ -3186,7 +2853,7 @@ class OracleLabService:
                         },
                     )
                     return result_event
-                content = self._mechanical_tool_result_content(request, result_event)
+                content = mechanical_tool_result_content(request, result_event)
                 adapter = self._append(
                     EventType.TOOL_RESULT_ADAPTED,
                     {
@@ -3539,17 +3206,6 @@ class OracleLabService:
                 },
             )
         )
-
-    @staticmethod
-    def _worker_archive_manifest(record: Any) -> dict[str, Any]:
-        return {
-            artifact.name: {
-                "path": str(artifact.path),
-                "sha256": artifact.sha256,
-                "size_bytes": artifact.size_bytes,
-            }
-            for artifact in record.artifacts
-        }
 
     def _archive_agent_result(
         self,
@@ -4093,7 +3749,7 @@ class OracleLabService:
                 or started.payload.get("job_id") != task_event.payload.get("job_id")
             ):
                 raise ServiceError("worker orphan archive belongs to another task")
-            manifest = self._worker_archive_manifest(snapshot.record)
+            manifest = artifact_manifest_view(snapshot.record.artifacts)
             status = known(snapshot.metadata, "execution", "status")
             adapter_id = known(snapshot.metadata, "identity", "adapter")
             expected_prompt = task.render()
@@ -4410,7 +4066,7 @@ class OracleLabService:
                         "failure_signature": failure_signature,
                         "repeated_equivalent_failure": repeated,
                         "archive_path": str(archive.directory),
-                        "archive_manifest": self._worker_archive_manifest(archive),
+                        "archive_manifest": artifact_manifest_view(archive.artifacts),
                     },
                     metadata={
                         "schema_version": 1,
@@ -4433,7 +4089,7 @@ class OracleLabService:
             finished_at=finished_at,
             status="completed" if result.succeeded else "failed",
         )
-        manifest = self._worker_archive_manifest(archive)
+        manifest = artifact_manifest_view(archive.artifacts)
         if not result.succeeded:
             reasons = []
             if result.exit_code != 0:
@@ -4739,7 +4395,7 @@ class OracleLabService:
                     "exit_code": 0,
                     "elapsed_ms": result.elapsed_ms,
                     "archive_path": str(archive.directory),
-                    "archive_manifest": self._worker_archive_manifest(archive),
+                    "archive_manifest": artifact_manifest_view(archive.artifacts),
                     "produced_event_ids": [event.id for event in produced],
                     "host_identity": {
                         "prompt_contract": HOST_PROMPT_CONTRACT_VERSION,
@@ -4869,7 +4525,7 @@ class OracleLabService:
                     "repeated_equivalent_failure": repeated,
                     "recovered_verified_orphan": recovered,
                     "archive_path": str(archive.directory),
-                    "archive_manifest": self._worker_archive_manifest(archive),
+                    "archive_manifest": artifact_manifest_view(archive.artifacts),
                     "host_identity": {
                         "prompt_contract": HOST_PROMPT_CONTRACT_VERSION,
                         "profile_id": profile.id,
@@ -6033,14 +5689,7 @@ class OracleLabService:
                 ),
                 archived_at=application.created_at,
             )
-        manifest = {
-            artifact.name: {
-                "path": str(artifact.path),
-                "sha256": artifact.sha256,
-                "size_bytes": artifact.size_bytes,
-            }
-            for artifact in archive.artifacts
-        }
+        manifest = artifact_manifest_view(archive.artifacts)
         succeeded = tool_status is ToolStatus.OK
         validation_event = self.store.append(
             Event.new(
@@ -6718,28 +6367,10 @@ class OracleLabService:
         session_id: str | None = None,
         model_id: str | None = None,
     ) -> dict[str, Any]:
-        clauses = []
-        parameters: list[Any] = []
-        if session_id:
-            clauses.append("session_id = ?")
-            parameters.append(session_id)
-        if model_id:
-            clauses.append("model_id = ?")
-            parameters.append(model_id)
-        where = f" WHERE {' AND '.join(clauses)}" if clauses else ""
-        row = self.store.connection.execute(
-            f"""
-            SELECT COUNT(*) AS records,
-                   COALESCE(SUM(prompt_tokens), 0) AS prompt_tokens,
-                   COALESCE(SUM(completion_tokens), 0) AS completion_tokens,
-                   COALESCE(SUM(reasoning_tokens), 0) AS reasoning_tokens,
-                   COALESCE(SUM(CAST(provider_cost AS REAL)), 0.0) AS provider_cost,
-                   COALESCE(SUM(request_count), 0) AS request_count
-            FROM usage_records{where}
-            """,
-            parameters,
-        ).fetchone()
-        return dict(row)
+        return UsageCostReadModel(self.store).cost_summary(
+            session_id=session_id,
+            model_id=model_id,
+        )
 
     def compare_models(
         self,

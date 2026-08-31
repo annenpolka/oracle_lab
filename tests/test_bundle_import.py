@@ -13,6 +13,7 @@ from typer.testing import CliRunner
 import oracle_lab.bundle_import as bundle_import_module
 import oracle_lab.cli as cli
 from oracle_lab.archive import RawResponseArchive
+from oracle_lab.artifact_manifest import artifact_manifest_view
 from oracle_lab.bundle_import import BundleImportError, ResearchBundleImporter
 from oracle_lab.events import Actor, ActorKind, Event, EventType
 from oracle_lab.jobs import JobStatus
@@ -162,14 +163,7 @@ def _rewrite_context_records(bundle: Path, mutation: str) -> None:
 
 
 def _archive_manifest(record: Any) -> dict[str, dict[str, Any]]:
-    return {
-        artifact.name: {
-            "path": str(artifact.path),
-            "sha256": artifact.sha256,
-            "size_bytes": artifact.size_bytes,
-        }
-        for artifact in record.artifacts
-    }
+    return artifact_manifest_view(record.artifacts)
 
 
 def _export_worker_validation_chain(

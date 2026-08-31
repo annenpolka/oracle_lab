@@ -139,6 +139,38 @@ Revisit when:
 Status: active
 Retention: repo-contract
 
+### Refactors preserve the façade and expose leaf responsibilities first
+Authority: Human stated and repo evidence
+Evidence: The human requested better navigability without changing ordinary
+result preservation. The 2026-08-31 architecture audit found 148 methods in
+`OracleLabService`, one function-local import cycle, and archive/transaction
+contracts that are intentionally non-uniform.
+Working default:
+- Keep `oracle_lab.services.OracleLabService`, existing module imports, event
+  schemas, and archive ordering stable while moving read-only leaf behavior into
+  explicit internal collaborators.
+- Do not unify archive writers, freeze helpers, state literals, or worker/tool
+  orchestration solely because their code looks similar; require behavioral
+  equivalence tests first.
+- Stop before a new collaborator needs a callback to the façade or copies its
+  runtime, archive, router, and queue state.
+Why it matters:
+- Navigability improves only when a new boundary has fewer dependencies and a
+  clear owner. Shape-only moves can hide the same coupling and put preserved
+  evidence at risk.
+Validation:
+- Preserve the full regression suite and public symbol identities, remove the
+  measured runtime import cycle, and reduce direct SQL in `services.py` through
+  mutation-free read models.
+- 2026-09-01 evidence: runtime SCC is 0; `services.py` is 7,208 -> 6,839
+  lines; direct SQL is 17 -> 11; generic `_rows()` call sites are 8 -> 5;
+  `755 passed, 1 skipped`, Ruff, format, and diff checks succeed.
+Revisit when:
+- Characterization tests expose a genuinely shared lower-level contract, or a
+  later feature requires a stronger domain boundary.
+Status: active
+Retention: repo-contract
+
 ## Open Questions And Discomfort
 
 - The intended boundary between data-driven runtime installation and actual Host

@@ -19,6 +19,7 @@ from oracle_lab.events import Actor, ActorKind, Event, EventType
 from oracle_lab.git_control import fingerprint_git_control
 from oracle_lab.services import OracleLabService, ServiceError
 from oracle_lab.store import EventIntegrityError, EventStore
+from oracle_lab.worker_read_model import WorkerReadModel
 
 CONFIG = Path(__file__).parents[1] / "config"
 
@@ -325,6 +326,23 @@ def test_service_automation_routes_repository_job_to_isolated_adapter(
     rebuilt = service.patch_status(patch.id)["state"]
     assert rebuilt["status"] == "applied"
     assert rebuilt["validation_status"] == "passed"
+
+    read_model = WorkerReadModel(service.store)
+    changes_before = service.store.connection.total_changes
+    events_before = tuple(event.id for event in service.store.list_events())
+    task_status = service.worker_task_status(enqueued["task_event"]["id"])
+    patch_show = service.patch_show(patch.id)
+
+    assert task_status == read_model.worker_task_status(enqueued["task_event"]["id"])
+    assert set(task_status) == {"task", "runs", "patches"}
+    assert patch_show == read_model.patch_show(patch.id)
+    assert patch_show == read_model.patch_status(patch.id)
+    assert patch_show == service.patch_status(patch.id)
+    assert set(patch_show) == {"patch", "state", "worker_run"}
+    assert patch_show["state"]["changed_paths"] == list(patch.payload["changed_paths"])
+    assert patch_show["state"]["validation_event_ids"] == [validation.id]
+    assert tuple(event.id for event in service.store.list_events()) == events_before
+    assert service.store.connection.total_changes == changes_before
 
 
 def test_default_service_rejects_enabled_coding_worker_before_subprocess(

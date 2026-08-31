@@ -78,6 +78,9 @@ candidate patchを確認し、人間承認後にsource-independent standalone st
 - [x] (2026-08-31 11:41:49Z) 最終同一snapshotでfocused 137 passed、全体pytest 719 passed/1 live opt-in skip、Ruff format/check、ExecPlan validator、`git diff --check`を通過した。二系統のread-only security auditでも残存P0/P1なしを確認し、live SBX、sandbox、Codex/OpenCode、OracleProvider、外部modelは起動していない。
 - [x] (2026-08-31 11:46:51Z) archive adapterに残っていたexact report typeの事前判定を削除し、任意Protocolへ触れず拒否する正本をcanonical payload builderだけにした。focused suiteは137 passedを維持し、production LOCは2063行、baseline比5行減になった。
 - [x] (2026-08-31 12:03:13Z) historical Progressのno-model observation完了部分と、現在も未解決のproduction isolation blockerを分離した。過去のmutating ownership probeを成功扱いへ変更せず、残作業を特権broker/conformance、6 blocker、明示opt-in live smokeの二つの未完了項目へ整理した。
+- [x] (2026-08-31 15:26:00Z) architecture refactorのleaf-first milestoneとして、worker task/patch statusのread-only SQLとJSON viewを`WorkerReadModel`へ抽出した。service façade、`ServiceError`、返却shape、projection rebuild後の値は維持し、focused 59 testsと共有worktree全723 testsが成功した。worker execution、archive、Human gate、staging、validation、production isolation guardは変更していない。
+- [x] (2026-08-31 16:06:00Z) worker/validation archive recordからevent payload用manifestを組み立てるpure viewだけを共通helperへ抽出した。archive writer、record class、required filename、filesystem検証、EventStore再検証は変更せず、tool/archive/recovery focused 135 testsが成功した。
+- [x] (2026-08-31 16:07:00Z) architecture refactor統合後の全suiteで755 passed/1 live opt-in skip、Ruff check/format、`git diff --check`を確認した。live SBX、sandbox、coding worker、OracleProvider、外部modelは起動していない。
 - [ ] (2026-08-31 03:46:21Z) security auditで発見したworkspace quiescence、guest Git control、data-plane network/credential、actual template instance、sandbox ownership、profile/workspace bindingの証拠不足を解消する。解消まではproduction `sbx` bindingを明示的に拒否し、実agent smokeを実行しない。
 
 ## Surprises & Discoveries
@@ -274,6 +277,12 @@ candidate patchを確認し、人間承認後にsource-independent standalone st
 - Observation: archive adapterとcanonical payload builderの双方にexact concrete report判定が残り、同じ入力を同じreasonで拒否していた。
   Evidence: builderは型不一致時にProtocol属性やmethodを一切評価せずstable payload errorを返すため、adapter側判定を除去してもarbitrary Protocol非実行回帰と公開reasonは不変だった。
 
+- Observation: worker status queryは実行pipelineから独立したleafであり、archiveやqueueを渡さず`EventStore`だけで抽出できた。
+  Evidence: `WorkerReadModel`の公開操作はtask status、patch show、patch statusの三つだけで、characterization testはquery前後のevent IDsとSQLite `total_changes`が同一であることを確認した。
+
+- Observation: worker archiveとvalidation archiveのwriter/failure contractは異なるが、archive済みartifact recordをevent用`path/sha256/size_bytes` viewへ写す処理だけは同値だった。
+  Evidence: `artifact_manifest_view()`はfilesystemを読まず、入力順、duplicate key上書き、例外挙動を既存comprehensionと同じに保つ。authoritativeなpath/hash/size検証は既存`EventStore` append boundaryに残り、focused 135 testsが成功した。
+
 ## Decision Log
 
 - Decision: コーディングエージェントは常に `worker` actorとして記録する。
@@ -419,6 +428,14 @@ candidate patchを確認し、人間承認後にsource-independent standalone st
 - Decision: sbx observation archiveはdirfd/O_NOFOLLOWでancestorを固定し、0600 staging artifactsをfsyncした後にno-replace atomic renameでcommitする。
   Rationale: raw tool outputがsymlink raceで別pathへ書かれたり、partial directoryがcanonical archiveとして見えたり、同じprobe IDが上書きされたりすることを防ぐため。
   Date/Author: 2026-08-31 08:27:02Z / Observation archive hardening
+
+- Decision: worker read-model refactorでは`OracleLabService`の公開methodを残し、execution、archive、recovery、Human decisionを同じcomponentへ移さない。
+  Rationale: status表示のread-only責務だけは少数依存で閉じるが、worker executionはtransaction、filesystem、Git、sandboxへ強く結合しており、同時移動は安全境界を不明瞭にするため。
+  Date/Author: 2026-08-31 15:26:00Z / Architecture refactor
+
+- Decision: worker/validation archive間ではartifact manifestのpure presentation viewだけを共有し、record、writer、required artifacts、known/null decode、recovery predicateは共通化しない。
+  Rationale: viewは既に発行されたconcrete recordの三fieldを写すだけだが、writerとrecoveryは異なるfail-closed契約を持つため。
+  Date/Author: 2026-08-31 16:06:00Z / Architecture refactor
 
 - Decision: SBX observationのsemantic contractとcanonical archive payloadは`sbx_observation_payload.py`を単一正本とし、report生成時とarchive直前の両方で同じvalidatorを呼ぶ。
   Rationale: defense layerを減らさず、read-only argv、truth domain、provenance、public metadata、raw hash/size、manifest layoutの実装重複だけを除去するため。
@@ -578,6 +595,18 @@ Codex/OpenCode、OracleProvider、外部modelは起動していない。
 2026-08-31 11:46:51Zに最後の重複type gateをpayload builderへ一本化した後も、canonical manifest hash、
 arbitrary Protocol非実行、forged real/provenance/argv拒否のfocused 137 testsは全件成功した。
 最終production LOCは465 + 756 + 389 + 453 = 2063行で、baseline 2068行から5行減少した。
+
+2026-08-31 15:26:00Zのarchitecture refactorでは、worker task/patch statusのread-only queryを
+`src/oracle_lab/worker_read_model.py`へ抽出した。`OracleLabService`は互換façadeとして残り、
+`ServiceError`の型とmessage、dict key、projection rebuild後のstatusは不変である。query前後でeventと
+SQLite change countが増えないことを固定し、`services.py`のdirect SQLは17から13へ減った。この変更は
+coding-workerの実行権限や隔離証明を広げず、6 blockerとlive-agent skipを維持する。
+
+2026-08-31 16:06:00Zには、worker/validation双方のevent manifest生成を
+`src/oracle_lab/artifact_manifest.py`のpure viewへ統合した。raw artifact、archive layout、filename、hash、
+byte count、write-once recovery、EventStoreの再検証は変更していない。known/unknown decodeとarchive
+writerは異なるfailure contractを維持したまま残し、統合後focused 135 tests、最終全suite 755 testsが
+成功した。production isolationの6 blockerとlive-agent opt-in gateは変更していない。
 
 ## Context and Orientation
 

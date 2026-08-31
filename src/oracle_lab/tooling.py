@@ -31,9 +31,9 @@ from typing import Any, ClassVar, Protocol
 import httpx
 
 from oracle_lab.config import SandboxConfig, ToolApproval
-from oracle_lab.events import Actor, ActorKind, Event, EventType
+from oracle_lab.events import Actor, ActorKind, Event, EventType, thaw_json
 from oracle_lab.ids import new_id
-from oracle_lab.jsonutil import canonical_json
+from oracle_lab.jsonutil import canonical_json, sha256_json
 from oracle_lab.virtual import SourceEvidence, VirtualWorldRuntime
 
 
@@ -144,6 +144,42 @@ class ToolRequest:
             "resume_oracle": self.resume_oracle,
             "timeout_ms": self.timeout_ms,
         }
+
+
+def mechanical_tool_result_content(request: ToolRequest, result_event: Event) -> str:
+    """Format a tool observation without interpretive Host prose."""
+
+    tool_input = thaw_json(request.input)
+    command = tool_input.get("command")
+    expression = tool_input.get("expression")
+    url = tool_input.get("url")
+    if isinstance(command, str):
+        invocation = command
+    elif isinstance(expression, str):
+        invocation = f"{request.tool} {expression}"
+    elif isinstance(url, str) and request.tool == "web_verify":
+        invocation = f"GET {url}"
+    else:
+        invocation = f"{request.tool} {canonical_json(tool_input)}"
+    output = result_event.payload.get("output", "")
+    return f"$ {invocation}\n{output if isinstance(output, str) else str(output)}"
+
+
+def tool_loop_signature(request: ToolRequest, result_event: Event) -> str:
+    """Hash semantic tool input/result fields, excluding event identities."""
+
+    return sha256_json(
+        {
+            "tool": request.tool,
+            "execution": request.execution.value,
+            "input": thaw_json(request.input),
+            "status": result_event.payload.get("status"),
+            "output": result_event.payload.get("output"),
+            "error": result_event.payload.get("error"),
+            "exit_code": result_event.payload.get("exit_code"),
+            "truth_domain": result_event.payload.get("truth_domain"),
+        }
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -1387,4 +1423,6 @@ __all__ = [
     "ToolStatus",
     "ToolWorker",
     "TruthDomain",
+    "mechanical_tool_result_content",
+    "tool_loop_signature",
 ]
