@@ -1,0 +1,18 @@
+[sandbox]
+backend = "docker"
+image = "python:3.13-alpine"
+network = false
+read_only_root = true
+timeout_ms = 5000
+memory_mb = 256
+cpus = 1.0
+pids_limit = 64
+max_output_bytes = 1048576
+
+[virtual]
+allowed_commands = ["cat", "ls", "stat", "find", "grep", "ps", "kill", "clock"]
+
+[verification]
+# Verification remains off until the curator explicitly allowlists exact HTTPS hosts.
+allowed_hosts = []
+max_output_bytes = 1048576

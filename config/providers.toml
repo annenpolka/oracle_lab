@@ -1,0 +1,28 @@
+[openrouter]
+kind = "openrouter"
+base_url = "https://openrouter.ai/api/v1"
+api_key_env = "OPENROUTER_API_KEY"
+timeout_seconds = 120
+max_retries = 2
+retry_base_seconds = 0.25
+max_concurrency = 4
+requests_per_minute = 60
+
+[local-openai]
+kind = "openai_compatible"
+base_url = "http://127.0.0.1:8000/v1"
+api_key_env = "OPENAI_COMPATIBLE_API_KEY"
+timeout_seconds = 300
+max_retries = 1
+retry_base_seconds = 0.25
+max_concurrency = 4
+requests_per_minute = 120
+
+[local-mlx]
+kind = "local_mlx"
+base_url = "http://127.0.0.1:8080/v1"
+timeout_seconds = 300
+max_retries = 1
+retry_base_seconds = 0.25
+max_concurrency = 2
+requests_per_minute = 60

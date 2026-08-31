@@ -1,0 +1,31 @@
+[oracle]
+auto_continue_after_tool_result = true
+max_auto_depth = 4
+max_auto_budget = 16
+
+[analysis]
+claims = true
+mechanisms = true
+contradictions = true
+attractors = true
+motifs = true
+
+[human_gate]
+probe_generation = true
+canon_promotion = true
+branch_creation = false
+
+[tools]
+calculator = "auto"
+unit_conversion = "auto"
+regex_text = "auto"
+checksum = "auto"
+file_parsing = "auto"
+python_sandbox = "auto"
+shell_sandbox = "ask"
+virtual_world = "auto"
+web_verify = "ask"
+
+[cost]
+hard_limit_usd_per_day = 20.0
+warn_limit_usd_per_session = 5.0

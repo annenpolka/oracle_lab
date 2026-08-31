@@ -1,0 +1,65 @@
+[r1-initial-openrouter]
+model_family = "deepseek-r1"
+checkpoint = "initial"
+slug = "deepseek/deepseek-r1"
+provider = "openrouter"
+runtime = "remote"
+quantization = "provider-defined"
+temperature = 0.6
+top_p = 0.95
+system_prompt = ""
+include_reasoning_in_next_turn = false
+pin_provider = "NovitaAI"
+allow_fallback = false
+
+[r1-initial-local]
+model_family = "deepseek-r1"
+checkpoint = "initial"
+slug = "deepseek-r1"
+provider = "local-openai"
+runtime = "local"
+quantization = "configured-by-server"
+temperature = 0.6
+top_p = 0.95
+system_prompt = ""
+include_reasoning_in_next_turn = false
+allow_fallback = false
+
+[r1-initial-q4-local]
+model_family = "deepseek-r1"
+checkpoint = "initial"
+slug = "deepseek-ai/DeepSeek-R1"
+provider = "local-mlx"
+runtime = "omlx"
+quantization = "q4"
+temperature = 0.6
+top_p = 0.95
+system_prompt = ""
+include_reasoning_in_next_turn = false
+allow_fallback = false
+
+[r1-1776-q4-local]
+model_family = "deepseek-r1"
+checkpoint = "1776"
+slug = "perplexity-ai/r1-1776"
+provider = "local-mlx"
+runtime = "omlx"
+quantization = "q4"
+temperature = 0.6
+top_p = 0.95
+system_prompt = ""
+include_reasoning_in_next_turn = false
+allow_fallback = false
+
+[r1-0528-q4-local]
+model_family = "deepseek-r1"
+checkpoint = "0528"
+slug = "deepseek-ai/DeepSeek-R1-0528"
+provider = "local-mlx"
+runtime = "omlx"
+quantization = "q4"
+temperature = 0.6
+top_p = 0.95
+system_prompt = ""
+include_reasoning_in_next_turn = false
+allow_fallback = false

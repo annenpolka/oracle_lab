@@ -1,0 +1,51 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "oracle-lab"
+version = "0.1.0"
+description = "Event-driven exploration and curation platform for historical language models"
+readme = "README.md"
+requires-python = ">=3.13"
+license = { text = "MIT" }
+authors = [{ name = "Oracle Lab contributors" }]
+dependencies = [
+  "httpx>=0.28,<1",
+  "markdown-it-py>=4,<5",
+  "pydantic>=2.11,<3",
+  "rich>=14,<15",
+  "textual>=6,<7",
+  "typer>=0.16,<1",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.4,<10",
+  "pytest-cov>=6,<8",
+  "ruff>=0.12,<1",
+]
+otel = [
+  "opentelemetry-api>=1.36,<2",
+  "opentelemetry-sdk>=1.36,<2",
+]
+
+[project.scripts]
+oracle = "oracle_lab.cli:app"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/oracle_lab"]
+
+[tool.pytest.ini_options]
+addopts = "-ra"
+testpaths = ["tests"]
+markers = [
+  "live_agent: operator-opt-in tests that may call an external coding-agent CLI",
+]
+
+[tool.ruff]
+target-version = "py313"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]

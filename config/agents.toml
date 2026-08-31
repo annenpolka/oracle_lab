@@ -1,0 +1,60 @@
+[router]
+enabled = false
+prefer_coding_agent = "codex"
+isolation_backend = "disabled"
+isolation_broker_executable = "sbx"
+
+[workers.codex]
+enabled = false
+adapter = "codex"
+executable = "codex"
+model = ""
+timeout_seconds = 300
+max_output_bytes = 4194304
+sandbox_profile = "external-broker"
+allowed_environment_names = ["LANG", "LC_ALL", "TERM"]
+fallback_adapter = "opencode"
+max_retries = 0
+validation_commands = []
+isolation_template_reference = ""
+isolation_allowed_hosts = ["api.openai.com", "chatgpt.com", "openai.com", "www.chatgpt.com"]
+max_workspace_export_bytes = 67108864
+max_workspace_entries = 100000
+
+[workers.opencode]
+enabled = false
+adapter = "opencode"
+executable = "opencode"
+model = ""
+timeout_seconds = 300
+max_output_bytes = 4194304
+sandbox_profile = "external-broker"
+allowed_environment_names = ["LANG", "LC_ALL", "TERM"]
+max_retries = 0
+validation_commands = []
+isolation_template_reference = ""
+isolation_allowed_hosts = []
+max_workspace_export_bytes = 67108864
+max_workspace_entries = 100000
+
+[workers.direct]
+enabled = false
+adapter = "direct"
+executable = "direct-api"
+# Host analysis identity is intentionally configured here and never inherited
+# from config/models.toml, which is reserved for the Oracle under observation.
+model = "configure-host-model"
+timeout_seconds = 120
+max_output_bytes = 1048576
+sandbox_profile = "api-only"
+allowed_environment_names = []
+max_retries = 0
+validation_commands = []
+host_provider_kind = "openai_compatible"
+host_provider_id = "configure-host-provider"
+host_base_url = "http://127.0.0.1:8000/v1"
+host_api_key_env = "ORACLE_LAB_HOST_API_KEY"
+host_temperature = 0.0
+host_top_p = 1.0
+host_max_tokens = 2048
+host_allow_fallback = false
