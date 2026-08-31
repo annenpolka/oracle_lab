@@ -1019,6 +1019,38 @@ Support:
 
 Signals may result in virtual-world events.
 
+## 14.4 Oracle-led capability evolution
+
+The virtual runtime is open-ended. R1 may introduce paths, commands, devices,
+processes, clocks, protocols, or operations that the current runtime does not
+yet understand. These outputs are capability proposals and source evidence;
+they are not executable implementations.
+
+The Host should evolve the system in response to those proposals by adding the
+smallest auditable capability needed for a later explicit operation. Prefer a
+data-driven entity, command, or operation definition over hard-coded lore and
+prefer a reusable runtime primitive over a special case for one motif. Keep
+unneeded semantics unresolved.
+
+Every capability extension must preserve:
+
+- the exact R1 output that introduced or motivated it
+- the source event IDs and branch on which it became available
+- the actor that supplied each new semantic field
+- a stable handler or interpreter ID and version
+- the truth domain of observations produced through it
+- the event from which the capability becomes effective
+
+Installing a capability must not retroactively reinterpret earlier events.
+Historical replay uses the capability snapshot that was effective at that point,
+or records an explicit migration as a new Host-originated event.
+
+If an extension requires changing Host source code, R1 output may motivate a
+candidate patch, but it must not become executable Host code automatically. The
+normal human-approval, isolated staging, and validation boundaries still apply.
+This lets the system grow around unexpected R1 affordances without turning R1
+into the orchestrator or letting the Host silently complete its fictional world.
+
 ---
 
 # 15. Canon and Claim Lifecycle

@@ -1,6 +1,11 @@
 # Oracle Lab contributor rules
 
 - Read and follow `ORACLE_PRESERVATION.md`; its invariants are normative.
+- Read `.stratal/brief.md` before judgment-heavy design or implementation work.
+  Treat it as the repo-local working contract for recurring human intent, update
+  it when that intent or its validation evidence changes, and keep the change
+  compact. Stratal may clarify working defaults but never relax
+  `ORACLE_PRESERVATION.md` or rewrite historical records.
 - For Host coding-worker changes, follow the living
   `coding_agent_operational_integration_execplan.md` and update its progress,
   decisions, discoveries, and outcomes with the implementation.
