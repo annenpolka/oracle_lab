@@ -13,6 +13,7 @@ from typing import Any
 
 from oracle_lab.jsonutil import canonical_json, sha256_bytes, sha256_text
 from oracle_lab.material import mapping_is_explicit_worker_artifact
+from oracle_lab.public_view import public_view
 
 _SAFE_NAME = re.compile(r"[^A-Za-z0-9_.-]+")
 _WORKER_ARTIFACT_NAMES = frozenset(
@@ -29,6 +30,63 @@ _WORKER_ARTIFACT_NAMES = frozenset(
 _VALIDATION_ARTIFACT_NAMES = frozenset(
     {"task.json", "command.json", "stdout.bin", "stderr.bin", "metadata.json"}
 )
+_PUBLIC_GENERATION_IDENTITY_FIELDS = (
+    "model",
+    "provider",
+    "context_hash",
+    "archive_sha256",
+    "archive_size_bytes",
+    "archive_byte_count",
+)
+_PUBLIC_SAMPLING_FIELDS = (
+    "temperature",
+    "top_p",
+    "top_k",
+    "min_p",
+    "max_tokens",
+    "max_completion_tokens",
+    "min_tokens",
+    "stop_tokens",
+    "frequency_penalty",
+    "presence_penalty",
+    "provider_pin",
+    "seed",
+    "stop",
+)
+_PUBLIC_MODEL_IDENTITY_FIELDS = (
+    "requested_model_profile_id",
+    "requested_model_slug",
+    "model_family",
+    "checkpoint",
+    "runtime",
+    "quantization",
+    "requested_provider_id",
+    "actual_provider",
+    "actual_model_identifier",
+    "fallback_occurred",
+    "unknown_fields",
+)
+_PUBLIC_PROVIDER_ROUTING_FIELDS = ("pin_provider", "allow_fallback")
+_PUBLIC_BUNDLE_REDACTION_POLICY = {
+    "policy": "generation_identity_allowlist",
+    "omitted_categories": [
+        "arbitrary_event_and_payload_metadata",
+        "provider_transport_metadata",
+        "local_archive_paths",
+        "raw_archive_artifacts",
+        "worker_and_validation_artifacts",
+    ],
+    "transformed_categories": [
+        "credential_and_cookie_metadata",
+        "secret_like_generation_metadata",
+    ],
+    "preserved_categories": [
+        "human_kept_genuine_oracle_text",
+        "oracle_text_hash",
+        "event_provenance",
+        "generation_identity_allowlist",
+    ],
+}
 
 
 def _mapping(value: Any) -> dict[str, Any]:
@@ -603,10 +661,129 @@ def export_selected_corpus(
     return path
 
 
+def _public_generation_identity(event: Mapping[str, Any]) -> dict[str, Any]:
+    """Copy only public generation identity fields and redact their metadata values."""
+
+    payload = _payload(event)
+    identity = {
+        field: payload[field] for field in _PUBLIC_GENERATION_IDENTITY_FIELDS if field in payload
+    }
+    if "model" not in identity:
+        model = payload.get("provider_model_id") or payload.get("model_profile_id")
+        if model is not None:
+            identity["model"] = model
+    if "provider" not in identity and payload.get("provider_name") is not None:
+        identity["provider"] = payload["provider_name"]
+    for field in ("sampling", "effective_sampling"):
+        if field not in payload:
+            continue
+        value = payload[field]
+        identity[field] = (
+            {
+                name: value[name]
+                for name in _PUBLIC_SAMPLING_FIELDS
+                if isinstance(value, Mapping) and name in value
+            }
+            if isinstance(value, Mapping)
+            else value
+        )
+    if "model_identity" in payload:
+        model_identity = payload["model_identity"]
+        if isinstance(model_identity, Mapping):
+            public_model_identity = {
+                name: model_identity[name]
+                for name in _PUBLIC_MODEL_IDENTITY_FIELDS
+                if name in model_identity
+            }
+            routing = model_identity.get("provider_routing")
+            if isinstance(routing, Mapping):
+                public_model_identity["provider_routing"] = {
+                    name: routing[name]
+                    for name in _PUBLIC_PROVIDER_ROUTING_FIELDS
+                    if name in routing
+                }
+            elif "provider_routing" in model_identity:
+                public_model_identity["provider_routing"] = routing
+            identity["model_identity"] = public_model_identity
+        else:
+            identity["model_identity"] = model_identity
+    # Generation identity is infrastructure metadata even though the public bundle
+    # deliberately does not expose the canonical api_response_metadata envelope.
+    viewed = public_view({"api_response_metadata": identity})
+    if not isinstance(viewed, Mapping):
+        raise TypeError("public view must preserve the generation identity mapping")
+    viewed_identity = viewed.get("api_response_metadata")
+    if not isinstance(viewed_identity, Mapping):
+        raise TypeError("public view must preserve the generation identity payload")
+    return dict(viewed_identity)
+
+
+def public_bundle_records(
+    events: Iterable[Any],
+    *,
+    provenance: Mapping[str, Sequence[str]] | None = None,
+) -> list[dict[str, Any]]:
+    """Build the non-authoritative public view of Human-kept Oracle outputs."""
+
+    mapped_events = [_mapping(event) for event in events]
+    by_id = {_event_id(event): event for event in mapped_events}
+    records = selected_corpus_records(mapped_events, provenance=provenance)
+    public_records: list[dict[str, Any]] = []
+    for record in records:
+        source = by_id[record["event_id"]]
+        public_record = {
+            **record,
+            "generation_identity": _public_generation_identity(source),
+        }
+        viewed_record = public_view(public_record)
+        if not isinstance(viewed_record, Mapping):
+            raise TypeError("public view must preserve public bundle records")
+        public_records.append(dict(viewed_record))
+    return public_records
+
+
+def export_public_bundle(
+    destination: str | Path,
+    *,
+    events: Iterable[Any],
+    provenance: Mapping[str, Sequence[str]] | None = None,
+) -> Path:
+    """Write a non-importable public bundle without canonical provider artifacts."""
+
+    root = Path(destination)
+    if root.exists() and (not root.is_dir() or any(root.iterdir())):
+        raise FileExistsError("public bundle destination must be absent or an empty directory")
+    root.mkdir(parents=True, exist_ok=True)
+
+    records = public_bundle_records(events, provenance=provenance)
+    _write_text(root / "records.jsonl", _jsonl(records))
+    _write_text(root / "redactions.json", _json_document(_PUBLIC_BUNDLE_REDACTION_POLICY))
+
+    file_hashes = {
+        path.name: sha256_bytes(path.read_bytes())
+        for path in sorted(root.iterdir())
+        if path.is_file()
+    }
+    manifest = {
+        "format": "oracle-lab-public-bundle",
+        "version": 1,
+        "authority": "derived_public_view",
+        "importable": False,
+        "content_review_required": True,
+        "created_at": dt.datetime.now(dt.UTC).isoformat(),
+        "counts": {"records": len(records)},
+        "sha256": file_hashes,
+    }
+    _write_text(root / "manifest.json", _json_document(manifest))
+    return root
+
+
 __all__ = [
+    "export_public_bundle",
     "export_research_bundle",
     "export_selected_corpus",
     "export_transcript",
+    "public_bundle_records",
     "render_transcript",
     "selected_corpus_records",
 ]

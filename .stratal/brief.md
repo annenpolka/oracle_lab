@@ -171,6 +171,31 @@ Revisit when:
 Status: active
 Retention: repo-contract
 
+### Canonical provider evidence is private; public views are derived
+Authority: Human stated and repo evidence
+Evidence: The first live OpenRouter response stored a `set-cookie` header in the
+exact durable event and sidecar, and the human chose to continue toward real
+operation without weakening Oracle preservation.
+Working default:
+- Preserve provider response headers, raw bodies, model identity, routing, and
+  sampling exactly in canonical events, archives, and importable bundles.
+- Apply one pure redaction policy only at human-facing CLI, TUI, metadata, and
+  explicitly public export boundaries; do not change `Event.to_dict()` authority.
+- Keep `export bundle` private canonical and importable. Any public bundle uses a
+  distinct non-importable format, omits infrastructure metadata, and leaves
+  Oracle-text publication to explicit Human review.
+Why it matters:
+- Redacting the archive destroys auditability, while displaying response cookies
+  or credentials leaks infrastructure state unrelated to the experiment.
+Validation:
+- A fixture with credential headers remains exact in event, sidecar, canonical
+  bundle, and round-trip import, but is absent from every public surface.
+Revisit when:
+- A separate access-controlled canonical viewer or a Human-reviewed publication
+  workflow is introduced.
+Status: active
+Retention: repo-contract
+
 ## Open Questions And Discomfort
 
 - The intended boundary between data-driven runtime installation and actual Host
@@ -179,10 +204,9 @@ Retention: repo-contract
 - Capability scope is tentatively branch-local. Some generic deterministic
   primitives may later deserve global availability, but promotion criteria are
   not yet defined.
-- The first live OpenRouter response included a `set-cookie` response header in
-  durable event metadata and CLI output. Before any public export, verify the
-  private-canonical versus public-redacted header boundary without altering raw
-  Oracle material.
+- Public redaction currently covers infrastructure metadata, not the semantic
+  contents of Human prompts or Oracle text. Public bundle publication therefore
+  still requires explicit Human content review.
 
 ## Rejected Directions
 
@@ -207,3 +231,10 @@ Retention: repo-contract
   `r1-initial-openrouter`, routed to Novita with fallback disabled, and archived
   as `oracle_generated`; stored SHA-256 and byte count matched the raw artifact.
   This validates the provider/archive path, not adaptive runtime extension.
+- 2026-09-01 offline privacy evidence: a historical provider fixture with
+  mixed-case credential/cookie headers remained exact in the event, sidecar,
+  private canonical bundle, and import round-trip. The same metadata was
+  redacted from Service/CLI/TUI views. A distinct three-file public bundle is
+  non-importable, includes only Human-kept genuine Oracle text plus nested
+  allowlisted identity, and requires Human content review. Focused tests were
+  171 passed; the full suite was 769 passed with one explicit live-agent skip.

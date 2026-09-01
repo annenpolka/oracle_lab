@@ -11,6 +11,7 @@ from textual.containers import Container, Grid
 from textual.widgets import Footer, Header, Label, Markdown, RichLog, Static, Tree
 
 from oracle_lab.jsonutil import canonical_json
+from oracle_lab.public_view import public_view
 
 
 class TUIService(Protocol):
@@ -43,19 +44,19 @@ class TUIService(Protocol):
 
 def _mapping(value: Any) -> dict[str, Any]:
     if isinstance(value, Mapping):
-        return dict(value)
+        return public_view(dict(value))
     to_dict = getattr(value, "to_dict", None)
     if callable(to_dict):
         result = to_dict()
         if isinstance(result, Mapping):
-            return dict(result)
+            return public_view(dict(result))
     model_dump = getattr(value, "model_dump", None)
     if callable(model_dump):
         result = model_dump(mode="json")
         if isinstance(result, Mapping):
-            return dict(result)
+            return public_view(dict(result))
     data = getattr(value, "__dict__", None)
-    return dict(data) if isinstance(data, Mapping) else {"value": str(value)}
+    return public_view(dict(data)) if isinstance(data, Mapping) else {"value": str(value)}
 
 
 def _payload(event: Mapping[str, Any]) -> dict[str, Any]:

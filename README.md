@@ -41,6 +41,10 @@ select the `r1-initial-openrouter` profile from `config/models.toml`.
 - Provider bodies are archived byte-for-byte under
   `archive/raw/YYYY/MM/DD/<event-id>.json`; sidecar metadata and SHA-256 keep the
   provider envelope auditable.
+- Provider response headers and API metadata are private canonical evidence.
+  They remain exact in the durable event, sidecar, and importable research
+  bundle, while CLI/TUI public views redact credential, cookie, and recognized
+  secret-like generation metadata values.
 - Rendered Markdown and search indexes are caches, never archival replacements.
 - Human/orchestrator prompts, including whitespace, are stored unchanged and can
   be correlated with output attractors using `oracle research prompt-attractors`.
@@ -67,7 +71,7 @@ uv run oracle replay host evt_... --host-profile frontier-v2
 Missing historical provider, sampler, routing, or system-prompt fields remain
 explicitly unknown; the importer never guesses them.
 
-A portable research bundle is imported through the same command. The importer
+A private canonical research bundle is imported through the same command. The importer
 verifies every manifested file and event relationship, rebuilds disposable
 projections from the event log, and copies provider bytes into the destination's
 write-once archive so the reconstructed session does not depend on the bundle's
@@ -369,12 +373,21 @@ uv run oracle research contradiction-mechanisms --session ses_...
 uv run oracle research latex-prefixes --session ses_...
 uv run oracle research prompt-attractors --phrase 報告書 --session ses_...
 uv run oracle export bundle bundle-dir --session ses_...
+uv run oracle export public-bundle public-bundle-dir --session ses_...
 uv run oracle export transcript transcript.md --session ses_...
 uv run oracle export corpus selected.jsonl --session ses_...
 ```
 
-Research bundles require an absent or empty destination directory; exports
-never merge with stale files from an earlier session.
+`export bundle` is the private canonical, importable format. It contains exact
+provider metadata and raw archive artifacts and must not be published as a
+redacted artifact. `export public-bundle` is a separate, non-importable derived
+format containing only Human-kept genuine Oracle outputs plus whitelisted
+generation identity. It omits provider response metadata, local archive paths,
+and worker/validation artifacts. Oracle text remains exact, so its manifest
+requires explicit Human content review before publication.
+
+Bundle exports require an absent or empty destination directory; exports never
+merge with stale files from an earlier session.
 
 Host branch proposals use the configured `branch_creation` gate. A gated
 proposal is materialized only after `oracle session approve-fork <proposal-event>`.

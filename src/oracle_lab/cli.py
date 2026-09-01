@@ -12,6 +12,7 @@ import typer
 
 from oracle_lab.events import Actor, ActorKind
 from oracle_lab.jsonutil import json_default
+from oracle_lab.public_view import public_view
 from oracle_lab.sbx_probe import SbxProbeError, observe_and_archive_no_model_sbx
 from oracle_lab.services import OracleLabService, ServiceError
 from oracle_lab.worker_readiness import inspect_worker_readiness
@@ -75,7 +76,13 @@ def _service(context: typer.Context) -> OracleLabService:
 
 def _emit(value: Any) -> None:
     typer.echo(
-        json.dumps(value, ensure_ascii=False, indent=2, sort_keys=True, default=json_default)
+        json.dumps(
+            public_view(value),
+            ensure_ascii=False,
+            indent=2,
+            sort_keys=True,
+            default=lambda item: public_view(json_default(item)),
+        )
     )
 
 
@@ -631,6 +638,15 @@ def export_bundle(
     session_id: Annotated[str | None, typer.Option("--session")] = None,
 ) -> None:
     _call(_service(context).export, "bundle", destination, session_id=session_id)
+
+
+@export_app.command("public-bundle")
+def export_public_bundle(
+    context: typer.Context,
+    destination: str,
+    session_id: Annotated[str | None, typer.Option("--session")] = None,
+) -> None:
+    _call(_service(context).export, "public-bundle", destination, session_id=session_id)
 
 
 @export_app.command("transcript")

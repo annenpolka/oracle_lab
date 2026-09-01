@@ -28,6 +28,7 @@ from typing import Any
 from oracle_lab.artifact_manifest import artifact_manifest_view
 from oracle_lab.events import Actor, ActorKind, Event, EventType, thaw_json
 from oracle_lab.exporting import (
+    export_public_bundle,
     export_research_bundle,
     export_selected_corpus,
     export_transcript,
@@ -42,6 +43,7 @@ from oracle_lab.ids import new_id
 from oracle_lab.jsonutil import canonical_json, sha256_bytes, sha256_json, sha256_text
 from oracle_lab.material import is_synthetic_lineage, is_worker_lineage, material_origins
 from oracle_lab.observability import ObservabilityService
+from oracle_lab.public_view import public_view
 from oracle_lab.research_read_model import ResearchCatalogReadModel
 from oracle_lab.store import EventStore
 from oracle_lab.usage_cost_read_model import UsageCostReadModel
@@ -392,10 +394,14 @@ class OracleLabService:
         session = self._branch_service().get_session(session_id)
         if session is None:
             raise ServiceError(f"session not found: {session_id}")
-        return {
-            "session": _jsonable(session),
-            "events": [_jsonable(event) for event in self.store.list_events(session_id=session_id)],
-        }
+        return public_view(
+            {
+                "session": _jsonable(session),
+                "events": [
+                    _jsonable(event) for event in self.store.list_events(session_id=session_id)
+                ],
+            }
+        )
 
     def switch_session(self, session_id: str) -> dict[str, Any]:
         session = self._branch_service().get_session(session_id)
@@ -1679,16 +1685,16 @@ class OracleLabService:
             # transitive synthetic-fixture boundary as projections and exports.
             value["material_origins"] = sorted(origin.value for origin in origins)
             value["synthetic_lineage"] = is_synthetic_lineage(event, self.store.get)
-            results.append(value)
+            results.append(public_view(value))
         return results
 
     def tail(self, limit: int = 20) -> list[dict[str, Any]]:
         session_id, _ = self._active()
         events = self.store.list_events(session_id=session_id, ascending=False, limit=limit)
-        return [event.to_dict() for event in reversed(events)]
+        return [public_view(event.to_dict()) for event in reversed(events)]
 
     def show_event(self, event_id: str) -> dict[str, Any]:
-        return self.store.require(event_id).to_dict()
+        return public_view(self.store.require(event_id).to_dict())
 
     def event_tree(self) -> list[dict[str, Any]]:
         session_id, _ = self._active()
@@ -1713,25 +1719,27 @@ class OracleLabService:
         """Serialize one provenance query without discarding graph identities."""
         edge_values = [_jsonable(edge) for edge in direct_edges]
         origin_values = [_jsonable(origin) for origin in origins]
-        return {
-            "target": dict(target),
-            "direct_edges": edge_values,
-            "direct_source_event_ids": list(
-                dict.fromkeys(str(edge["source_event_id"]) for edge in edge_values)
-            ),
-            "creator_event_ids": list(
-                dict.fromkeys(str(edge["created_event_id"]) for edge in edge_values)
-            ),
-            "actor_origins": sorted(dict.fromkeys(actor_origins)),
-            "source_event_ids": [
-                str(origin["event"]["id"])
-                for origin in origin_values
-                if isinstance(origin, Mapping)
-                and isinstance(origin.get("event"), Mapping)
-                and origin["event"].get("id") is not None
-            ],
-            "origins": origin_values,
-        }
+        return public_view(
+            {
+                "target": dict(target),
+                "direct_edges": edge_values,
+                "direct_source_event_ids": list(
+                    dict.fromkeys(str(edge["source_event_id"]) for edge in edge_values)
+                ),
+                "creator_event_ids": list(
+                    dict.fromkeys(str(edge["created_event_id"]) for edge in edge_values)
+                ),
+                "actor_origins": sorted(dict.fromkeys(actor_origins)),
+                "source_event_ids": [
+                    str(origin["event"]["id"])
+                    for origin in origin_values
+                    if isinstance(origin, Mapping)
+                    and isinstance(origin.get("event"), Mapping)
+                    and origin["event"].get("id") is not None
+                ],
+                "origins": origin_values,
+            }
+        )
 
     def provenance_trace(self, derived_kind: str, derived_id: str) -> dict[str, Any]:
         """Return direct edges and complete source lineage for a derived record."""
@@ -2487,23 +2495,25 @@ class OracleLabService:
     def generation_metadata(self, event_id: str) -> dict[str, Any]:
         event = self.store.require(event_id)
         payload = thaw_json(event.payload)
-        return {
-            "event_id": event.id,
-            "created_at": event.created_at.isoformat(),
-            "model": payload.get("model") or payload.get("model_profile_id"),
-            "provider": payload.get("provider"),
-            "sampling": payload.get("sampling"),
-            "requested_sampling": payload.get("sampling"),
-            "effective_sampling": payload.get("effective_sampling"),
-            "context_hash": payload.get("context_hash"),
-            "material_origin": payload.get("material_origin", "unknown"),
-            "model_identity": payload.get("model_identity"),
-            "api_response_metadata": payload.get("api_response_metadata"),
-            "provider_request_id": payload.get("provider_request_id"),
-            "archive_path": payload.get("archive_path"),
-            "archive_sha256": payload.get("archive_sha256"),
-            "metadata": thaw_json(event.metadata),
-        }
+        return public_view(
+            {
+                "event_id": event.id,
+                "created_at": event.created_at.isoformat(),
+                "model": payload.get("model") or payload.get("model_profile_id"),
+                "provider": payload.get("provider"),
+                "sampling": payload.get("sampling"),
+                "requested_sampling": payload.get("sampling"),
+                "effective_sampling": payload.get("effective_sampling"),
+                "context_hash": payload.get("context_hash"),
+                "material_origin": payload.get("material_origin", "unknown"),
+                "model_identity": payload.get("model_identity"),
+                "api_response_metadata": payload.get("api_response_metadata"),
+                "provider_request_id": payload.get("provider_request_id"),
+                "archive_path": payload.get("archive_path"),
+                "archive_sha256": payload.get("archive_sha256"),
+                "metadata": thaw_json(event.metadata),
+            }
+        )
 
     def _pending_human_judgment(self) -> Event | None:
         session_id, branch_id = self._active()
@@ -6238,7 +6248,11 @@ class OracleLabService:
                 else:
                     queue.complete(job.id, worker_id=worker_id)
                     processed.append(
-                        {"job_id": job.id, "status": "completed", "result": _jsonable(result)}
+                        {
+                            "job_id": job.id,
+                            "status": "completed",
+                            "result": public_view(_jsonable(result)),
+                        }
                     )
             finally:
                 heartbeat.stop()
@@ -6819,6 +6833,19 @@ class OracleLabService:
                 worker_archives=worker_archives,
                 validation_archives=validation_archives,
             )
+        elif kind == "public-bundle":
+            allowed_event_ids = {event.id for event in events}
+            provenance_rows = self._rows(
+                "SELECT derived_id, source_event_id FROM provenance_edges ORDER BY id"
+            )
+            provenance_map: dict[str, list[str]] = {}
+            for row in provenance_rows:
+                derived_id = str(row["derived_id"])
+                source_event_id = str(row["source_event_id"])
+                if derived_id not in allowed_event_ids or source_event_id not in allowed_event_ids:
+                    continue
+                provenance_map.setdefault(derived_id, []).append(source_event_id)
+            result = export_public_bundle(path, events=events, provenance=provenance_map)
         elif kind == "transcript":
             result = export_transcript(path, events=events, title=f"Session {session_id}")
         elif kind in {"corpus", "selected"}:

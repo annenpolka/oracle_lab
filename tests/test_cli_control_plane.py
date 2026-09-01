@@ -116,7 +116,9 @@ def test_root_and_nested_help_expose_the_complete_control_plane(
         assert command in session.output
     assert "run" in tool.output and "approve" in tool.output
     assert "inspect" in sandbox.output
-    assert "bundle" in export.output and "transcript" in export.output and "corpus" in export.output
+    assert all(
+        command in export.output for command in ("bundle", "public-bundle", "transcript", "corpus")
+    )
     assert "trace" in provenance.output and "event" in provenance.output
     assert "exact" in replay.output and "host" in replay.output
     assert all(
@@ -218,6 +220,10 @@ def test_root_and_nested_help_expose_the_complete_control_plane(
             "replay_host_analysis",
         ),
         (["cost", "--session", "ses_1"], "cost"),
+        (
+            ["export", "public-bundle", "public-bundle-dir", "--session", "ses_1"],
+            "export",
+        ),
         (
             [
                 "compare-models",
